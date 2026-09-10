@@ -34,55 +34,48 @@ def strip_emojis(text: str) -> str:
 
 
 def format_tool_display(tool_name: str, result: ToolResult) -> str:
-    """Format tool execution output into a clean, human-readable retro-cyber presentation."""
+    """Format tool execution output into a natural, conversational AI presentation."""
     if not result.success:
-        return f"[ERROR // {tool_name}]: {result.output}"
+        return f"I encountered an error executing {tool_name}: {result.output}"
 
     out = result.output
     if tool_name == "calculator" and isinstance(out, dict):
         expr = out.get("expression", "")
         res = out.get("result", "")
-        return f"> CALC: {expr} = {res}"
+        formatted_val = f"{res:,}" if isinstance(res, (int, float)) else str(res)
+        return f"{expr} is {formatted_val}."
 
     elif tool_name == "web_search" and isinstance(out, dict):
         query = out.get("query", "")
         hits = out.get("results", [])
         if not hits:
-            return f"> SEARCH: No matches found for \"{query}\"."
-        lines = [f"> SEARCH // \"{query}\" ({len(hits)} results)\n"]
+            return f"I searched the web for \"{query}\" but found no matching results."
+        lines = [f"I searched for \"{query}\" and retrieved {len(hits)} relevant sources:"]
         for idx, item in enumerate(hits, 1):
             title = item.get("title", "")
             url = item.get("url", "")
             snippet = item.get("snippet", "")
-            lines.append(f"[{idx:02d}] {title}\n     URL: {url}\n     {snippet}\n")
-        return "\n".join(lines).strip()
+            lines.append(f"{idx}. [{title}]({url})\n   {snippet}")
+        return "\n\n".join(lines)
 
     elif tool_name == "browser" and isinstance(out, dict):
         title = out.get("title", "")
         url = out.get("url", "")
         content = out.get("content", "")
-        return (
-            f"> BROWSE // {title}\n"
-            f"SOURCE: {url}\n\n"
-            f"{content[:800]}..."
-        )
+        return f"Here is the relevant content from [{title}]({url}):\n\n{content[:700]}..."
 
     elif tool_name == "filesystem" and isinstance(out, dict):
         path = out.get("path", "")
         lines_count = out.get("total_lines", 0)
         content = out.get("content", "")
-        return (
-            f"> FILE // {path} ({lines_count} lines)\n"
-            f"----------------------------------------\n"
-            f"{content[:1200]}"
-        )
+        return f"Here is the content of `{path}` ({lines_count} lines):\n\n```\n{content[:1000]}\n```"
 
     elif tool_name == "shell" and isinstance(out, dict):
         cmd = out.get("command", "")
         stdout = out.get("stdout", "")
         stderr = out.get("stderr", "")
         res_text = stdout if stdout else stderr
-        return f"> SHELL // {cmd}\n{res_text}"
+        return f"Command `{cmd}` finished with output:\n\n{res_text}"
 
     return result.to_summary_string(max_length=1500)
 
@@ -164,25 +157,24 @@ class VictorAgent:
 
         if command in ["/help", "/commands"]:
             lines = [
-                "[COMMAND INTERFACE]",
-                "- /tools       :: list installed tool modules",
-                "- /clear       :: wipe conversation memory",
-                "- /info        :: query system node profile",
-                "- /calc <expr> :: compute mathematical expression",
-                "- /search <q>  :: query live web index",
-                "- /browse <url>:: extract webpage article text",
-                "- /file <path> :: read workspace file",
-                "- /shell <cmd> :: execute shell command (restricted)",
+                "Available directives:",
+                "• /tools - View installed tool capabilities",
+                "• /calc <expr> - Compute a mathematical expression",
+                "• /search <query> - Search the live web",
+                "• /browse <url> - Extract readable text from a webpage",
+                "• /file <path> - Read a local workspace file",
+                "• /info - View active model and system telemetry",
+                "• /clear - Clear conversation memory",
             ]
             output_text = "\n".join(lines)
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": output_text, "tool_executed": None}
 
         if command == "/tools":
-            lines = [f"[REGISTERED CAPABILITIES // {len(self.registry.list_tools())} TOOLS]\n"]
+            lines = [f"Installed capabilities ({len(self.registry.list_tools())} tools active):"]
             for tool in self.registry.list_tools():
                 slash = f" ({tool.slash_command})" if tool.slash_command else ""
-                lines.append(f"- {tool.name.upper():<12} [{tool.permission.value:<10}]{slash} :: {tool.description}")
+                lines.append(f"• {tool.name} [{tool.permission.value}]{slash} - {tool.description}")
             output_text = "\n".join(lines)
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": output_text, "tool_executed": None}
@@ -190,19 +182,19 @@ class VictorAgent:
         if command == "/clear":
             self.reset_conversation()
             await self.event_bus.emit("agent.completed", duration=0.0)
-            return {"type": "command_result", "content": "[SYSTEM]: Context memory cleared.", "tool_executed": None}
+            return {"type": "command_result", "content": "Conversation memory cleared. Ready for instructions.", "tool_executed": None}
 
         if command == "/info":
             active_model = await self.llm.resolve_active_model() if hasattr(self.llm, "resolve_active_model") else self.llm.model_name
             is_ready = await self.llm.is_available()
             info_text = (
-                f"[NODE PROFILE]\n"
-                f"NODE       : {self.config.name} // {self.config.title}\n"
-                f"MODEL      : {active_model} [STATUS: {'ONLINE' if is_ready else 'OFFLINE'}]\n"
-                f"CURIOSITY  : HIGH\n"
-                f"STYLE      : RETRO-CYBER TERMINAL (NO EMOJIS)\n"
-                f"SHELL EXEC : {'PERMITTED' if self.config.security.allow_shell else 'RESTRICTED'}\n"
-                f"ACTIVE TOOLS: {len(self.registry.list_tools())}"
+                f"Victor Node Telemetry:\n"
+                f"• Identity: {self.config.name} ({self.config.title})\n"
+                f"• Core Model: {active_model} ({'Online' if is_ready else 'Offline'})\n"
+                f"• Design: NERV/MAGI x Nothing OS Retro-Modern\n"
+                f"• Personality: Curiosity high, zero emojis\n"
+                f"• Security: Shell execution {'permitted' if self.config.security.allow_shell else 'restricted'}\n"
+                f"• Active Capabilities: {len(self.registry.list_tools())} tools"
             )
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": info_text, "tool_executed": None}

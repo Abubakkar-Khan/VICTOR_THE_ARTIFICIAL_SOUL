@@ -1,45 +1,65 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const chatLog = document.getElementById("chat-log");
+  // Elements
+  const messageStream = document.getElementById("message-stream");
   const userInput = document.getElementById("user-input");
-  const sendBtn = document.getElementById("send-btn");
-  const clearBtn = document.getElementById("clear-chat-btn");
-  const statusIndicator = document.getElementById("connection-status");
-  const activeModelName = document.getElementById("active-model-name");
-  const toolsList = document.getElementById("tools-list");
+  const btnSubmit = document.getElementById("btn-submit");
+  const btnClearFeed = document.getElementById("clear-feed-btn");
+  const connPill = document.getElementById("conn-pill");
+  const activeCoreModel = document.getElementById("active-core-model");
+  const workflowPulseDot = document.getElementById("workflow-pulse-dot");
+  const pipelineLastTime = document.getElementById("pipeline-last-time");
+  const toolsCatalog = document.getElementById("tools-catalog");
+
+  // Workflow Inspector Elements
+  const nodeInspector = document.getElementById("node-inspector");
+  const closeInspectorBtn = document.getElementById("close-inspector-btn");
+  const inspNodeName = document.getElementById("insp-node-name");
+  const inspNodeStatus = document.getElementById("insp-node-status");
+  const inspNodeDuration = document.getElementById("insp-node-duration");
+  const inspNodeData = document.getElementById("insp-node-data");
+
+  // Node telemetry store
+  const telemetryStore = {
+    input: { name: "USER DIRECTIVE", status: "STANDBY", duration: "-", data: "Awaiting input." },
+    magi: { name: "COGNITIVE PLANNER", status: "STANDBY", duration: "-", data: "Idle." },
+    tool: { name: "TOOL EXECUTION", status: "STANDBY", duration: "-", data: "No tool active." },
+    obs: { name: "OBSERVATION & DATA", status: "STANDBY", duration: "-", data: "No data buffered." },
+    synth: { name: "NATURAL RECURSION", status: "STANDBY", duration: "-", data: "Awaiting synthesis." },
+  };
 
   let socket = null;
-  let isGenerating = false;
-  let activeToolCard = null;
+  let isTransmitting = false;
 
-  // Tab switching
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  // Tab Navigation
+  document.querySelectorAll(".nav-pill").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".view-panel").forEach((p) => p.classList.remove("active"));
+      document.querySelectorAll(".nav-pill").forEach((p) => p.classList.remove("active"));
+      document.querySelectorAll(".panel-section").forEach((sec) => sec.classList.remove("active"));
 
       btn.classList.add("active");
-      const target = document.getElementById(`${btn.dataset.tab}-tab`);
-      if (target) target.classList.add("active");
+      const viewId = `view-${btn.dataset.view}`;
+      const targetSec = document.getElementById(viewId);
+      if (targetSec) targetSec.classList.add("active");
     });
   });
 
-  // Fetch status
+  // Fetch initial status
   async function loadStatus() {
     try {
       const res = await fetch("/api/status");
       if (res.ok) {
         const data = await res.json();
-        activeModelName.textContent = (data.model || "QWEN2:1.5B").toUpperCase();
+        activeCoreModel.textContent = (data.model || "QWEN2:1.5B").toUpperCase();
         if (data.status === "online") {
-          statusIndicator.className = "meta-badge online";
-          statusIndicator.querySelector(".meta-text").textContent = "ONLINE";
+          connPill.className = "pill-badge status-online";
+          connPill.querySelector(".pill-text").textContent = "ONLINE";
         } else {
-          statusIndicator.className = "meta-badge offline";
-          statusIndicator.querySelector(".meta-text").textContent = "OFFLINE";
+          connPill.className = "pill-badge status-offline";
+          connPill.querySelector(".pill-text").textContent = "OFFLINE";
         }
       }
     } catch (e) {
-      console.warn("Status offline:", e);
+      console.warn("Status offline", e);
     }
   }
 
@@ -52,26 +72,26 @@ document.addEventListener("DOMContentLoaded", () => {
         renderTools(data.tools || []);
       }
     } catch (e) {
-      console.warn("Tools load failed:", e);
+      console.warn("Tools load fail", e);
     }
   }
 
   function renderTools(tools) {
-    if (!toolsList) return;
-    toolsList.innerHTML = "";
+    if (!toolsCatalog) return;
+    toolsCatalog.innerHTML = "";
     tools.forEach((tool) => {
-      const box = document.createElement("div");
-      box.className = "retro-tool-box";
-      const shortcut = tool.slash_command ? `<span class="box-shortcut">CMD: ${tool.slash_command}</span>` : "";
-      box.innerHTML = `
-        <div class="box-head">
-          <span class="box-tool-name">${tool.name.toUpperCase()}</span>
-          <span class="box-perm ${tool.permission}">[${tool.permission}]</span>
+      const card = document.createElement("div");
+      card.className = "catalog-card";
+      const shortcut = tool.slash_command ? `<div class="card-shortcut">DIRECTIVE: ${tool.slash_command}</div>` : "";
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="card-title">${tool.name.toUpperCase()}</span>
+          <span class="card-badge ${tool.permission}">[${tool.permission}]</span>
         </div>
-        <div class="box-desc">${escapeHtml(tool.description)}</div>
+        <div class="card-desc">${escapeHtml(tool.description)}</div>
         ${shortcut}
       `;
-      toolsList.appendChild(box);
+      toolsCatalog.appendChild(card);
     });
   }
 
@@ -83,121 +103,170 @@ document.addEventListener("DOMContentLoaded", () => {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log("[VICTOR] WebSocket link established");
+      console.log("[VICTOR // NERV] WebSocket telemetry linked");
     };
 
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        handleServerEvent(payload);
+        handleServerPayload(payload);
       } catch (err) {
-        console.error("Message parse error", err);
+        console.error("Payload error", err);
       }
     };
 
     socket.onclose = () => {
-      setTimeout(initWebSocket, 3000);
+      setTimeout(initWebSocket, 2500);
     };
   }
 
-  function handleServerEvent(payload) {
+  // Live Workflow State Machine
+  function resetWorkflowNodes() {
+    const nodes = ["input", "magi", "tool", "obs", "synth"];
+    nodes.forEach((n) => {
+      setNodeState(n, "STANDBY", "standby");
+    });
+    document.querySelectorAll(".signal-wire").forEach((w) => w.classList.remove("active"));
+    workflowPulseDot.classList.remove("pulsing");
+  }
+
+  function setNodeState(nodeKey, statusText, statusClass, previewText = null, rawData = null) {
+    const nodeEl = document.getElementById(`node-${nodeKey}`);
+    const statusEl = document.getElementById(`status-node-${nodeKey}`);
+    const previewEl = document.getElementById(`preview-${nodeKey}`);
+
+    if (nodeEl && statusEl) {
+      nodeEl.className = `magi-node ${statusClass === "running" ? "active" : statusClass === "locked" ? "locked" : ""}`;
+      statusEl.className = `node-status-pill ${statusClass}`;
+      statusEl.textContent = statusText;
+
+      if (previewText && previewEl) {
+        previewEl.textContent = previewText;
+      }
+
+      telemetryStore[nodeKey].status = statusText;
+      if (previewText) telemetryStore[nodeKey].data = previewText;
+      if (rawData) telemetryStore[nodeKey].data = rawData;
+    }
+  }
+
+  function handleServerPayload(payload) {
     if (payload.type === "event") {
       const evt = payload.event;
-      if (evt.topic === "tool.started") {
-        createToolCard(evt.data.tool, evt.data.parameters);
-      } else if (evt.topic === "tool.completed") {
-        finishToolCard(evt.data.tool, evt.data.duration, evt.data.output);
-      } else if (evt.topic === "tool.failed") {
-        failToolCard(evt.data.tool, evt.data.error, evt.data.output);
-      }
-    } else if (payload.type === "chat_result") {
-      appendVictorMessage(payload.data.content);
-      setGenerating(false);
-    }
-  }
+      const topic = evt.topic;
+      const data = evt.data || {};
 
-  function createToolCard(toolName, parameters) {
-    const card = document.createElement("div");
-    card.className = "retro-tool-card running";
-    card.innerHTML = `
-      <div class="tool-top-bar">
-        <span>┌── [ EXEC: ${toolName.toUpperCase()} ]</span>
-        <span>STATUS: BUSY</span>
-      </div>
-      <div class="tool-body-content">&gt; PARAMS: ${JSON.stringify(parameters)}</div>
-    `;
-    chatLog.appendChild(card);
-    chatLog.scrollTop = chatLog.scrollHeight;
-    activeToolCard = card;
-  }
+      if (topic === "agent.started") {
+        workflowPulseDot.classList.add("pulsing");
+        setNodeState("input", "LOCKED", "locked", data.user_message || data.command);
+        setNodeState("magi", "PLANNING", "running", "Analyzing directive...");
+        document.getElementById("path-1-2")?.classList.add("active");
 
-  function finishToolCard(toolName, duration, output) {
-    if (activeToolCard) {
-      activeToolCard.className = "retro-tool-card success";
-      const durText = duration !== undefined ? `${duration}s` : "";
-      activeToolCard.querySelector(".tool-top-bar").innerHTML = `
-        <span>├── [ FINISHED: ${toolName.toUpperCase()} ]</span>
-        <span>TIME: ${durText}</span>
-      `;
-      let preview = "";
-      if (typeof output === "object") {
-        if (output.formatted) {
-          preview = output.formatted;
-        } else if (output.results) {
-          preview = output.results.map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}`).join("\n");
-        } else {
-          preview = JSON.stringify(output, null, 2);
+      } else if (topic === "agent.thinking") {
+        const state = data.state || "synthesizing";
+        if (state === "synthesizing") {
+          setNodeState("synth", "SYNTHESIS", "running", "Formulating natural response...");
+          document.getElementById("path-4-5")?.classList.add("active");
         }
-      } else {
-        preview = String(output);
+
+      } else if (topic === "tool.started") {
+        const toolName = data.tool || "tool";
+        setNodeState("magi", "LOCKED", "locked", `Selected: ${toolName}`);
+        document.getElementById("path-2-3")?.classList.add("active");
+        setNodeState("tool", "RUNNING", "running", `Executing ${toolName}`, data.parameters);
+
+      } else if (topic === "tool.completed") {
+        const toolName = data.tool || "tool";
+        const dur = data.duration !== undefined ? `${data.duration}s` : "OK";
+        setNodeState("tool", `LOCKED [${dur}]`, "locked", `${toolName} finished in ${dur}`, data.output);
+        telemetryStore.tool.duration = dur;
+
+        document.getElementById("path-3-4")?.classList.add("active");
+        setNodeState("obs", "BUFFERED", "locked", "Observation formatted", data.output);
+
+      } else if (topic === "tool.failed") {
+        setNodeState("tool", "FAILED", "standby", data.error, data.output);
+
+      } else if (topic === "agent.completed") {
+        const dur = data.duration !== undefined ? `${data.duration}s` : "0.0s";
+        setNodeState("synth", `LOCKED [${dur}]`, "locked", "Natural output stream ready");
+        telemetryStore.synth.duration = dur;
+        if (pipelineLastTime) pipelineLastTime.textContent = dur;
+        workflowPulseDot.classList.remove("pulsing");
+        setTimeout(() => {
+          document.querySelectorAll(".signal-wire").forEach((w) => w.classList.remove("active"));
+        }, 1200);
       }
-      if (preview.length > 500) {
-        preview = preview.slice(0, 500) + "... [truncated]";
-      }
-      activeToolCard.querySelector(".tool-body-content").textContent = preview;
+
+    } else if (payload.type === "chat_result") {
+      appendVictorPacket(payload.data.content);
+      setTransmitting(false);
     }
   }
 
-  function failToolCard(toolName, error, output) {
-    if (activeToolCard) {
-      activeToolCard.className = "retro-tool-card failed";
-      activeToolCard.querySelector(".tool-top-bar").innerHTML = `
-        <span style="color:var(--red-alert)">├── [ FAILED: ${toolName.toUpperCase()} ]</span>
-        <span style="color:var(--red-alert)">ERR: ${error || "FAIL"}</span>
-      `;
-      activeToolCard.querySelector(".tool-body-content").textContent = String(output);
-    }
+  // Interactive Node Inspector
+  document.querySelectorAll(".magi-node").forEach((node) => {
+    node.addEventListener("click", () => {
+      const nodeKey = node.dataset.node;
+      const info = telemetryStore[nodeKey];
+      if (info) {
+        inspNodeName.textContent = info.name;
+        inspNodeStatus.textContent = info.status;
+        inspNodeDuration.textContent = info.duration || "-";
+        
+        let displayData = info.data;
+        if (typeof displayData === "object") {
+          displayData = JSON.stringify(displayData, null, 2);
+        }
+        inspNodeData.textContent = displayData;
+        nodeInspector.classList.add("open");
+      }
+    });
+  });
+
+  if (closeInspectorBtn) {
+    closeInspectorBtn.addEventListener("click", () => {
+      nodeInspector.classList.remove("open");
+    });
   }
 
-  function appendUserMessage(text) {
-    const msg = document.createElement("div");
-    msg.className = "term-msg user-entry";
-    const time = new Date().toTimeString().split(" ")[0];
-    msg.innerHTML = `
-      <div class="msg-wire">
-        <span class="wire-label">[ USER // IN ]</span>
-        <span class="wire-time">${time}</span>
-      </div>
-      <div class="msg-content">${escapeHtml(stripEmojis(text))}</div>
-    `;
-    chatLog.appendChild(msg);
-    chatLog.scrollTop = chatLog.scrollHeight;
+  const btnReplay = document.getElementById("btn-replay-trace");
+  if (btnReplay) {
+    btnReplay.addEventListener("click", resetWorkflowNodes);
   }
 
-  function appendVictorMessage(text) {
-    const msg = document.createElement("div");
-    msg.className = "term-msg victor-entry";
+  // Chat stream rendering
+  function appendUserPacket(text) {
+    const packet = document.createElement("div");
+    packet.className = "speech-packet user-packet";
     const time = new Date().toTimeString().split(" ")[0];
-    const cleaned = stripEmojis(text);
-    msg.innerHTML = `
-      <div class="msg-wire">
-        <span class="wire-label">[ VICTOR // OUT ]</span>
-        <span class="wire-time">${time}</span>
+    packet.innerHTML = `
+      <div class="packet-head">
+        <span class="packet-author">USER</span>
+        <span class="packet-time">${time}</span>
+        <span class="packet-sig">SIG: DIRECTIVE_IN</span>
       </div>
-      <div class="msg-content">${formatContent(cleaned)}</div>
+      <div class="packet-body">${escapeHtml(stripEmojis(text))}</div>
     `;
-    chatLog.appendChild(msg);
-    chatLog.scrollTop = chatLog.scrollHeight;
+    messageStream.appendChild(packet);
+    messageStream.scrollTop = messageStream.scrollHeight;
+  }
+
+  function appendVictorPacket(text) {
+    const packet = document.createElement("div");
+    packet.className = "speech-packet victor-packet";
+    const time = new Date().toTimeString().split(" ")[0];
+    const cleanText = stripEmojis(text);
+    packet.innerHTML = `
+      <div class="packet-head">
+        <span class="packet-author">VICTOR</span>
+        <span class="packet-time">${time}</span>
+        <span class="packet-sig">SIG: SYNTH_OUT</span>
+      </div>
+      <div class="packet-body">${formatMarkdownText(cleanText)}</div>
+    `;
+    messageStream.appendChild(packet);
+    messageStream.scrollTop = messageStream.scrollHeight;
   }
 
   function stripEmojis(str) {
@@ -214,30 +283,39 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/'/g, "&#039;");
   }
 
-  function formatContent(str) {
+  function formatMarkdownText(str) {
     if (!str) return "";
     let clean = escapeHtml(str);
-    clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    // Code blocks
+    clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (m, lang, code) => {
       return `<pre><code>${code.trim()}</code></pre>`;
     });
+    // Inline code
     clean = clean.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // Bold
+    clean = clean.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    // Markdown links
     clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     return clean;
   }
 
-  function setGenerating(generating) {
-    isGenerating = generating;
-    sendBtn.disabled = generating;
-    sendBtn.textContent = generating ? "[ BUSY... ]" : "[ EXEC ⏎ ]";
+  function setTransmitting(transmitting) {
+    isTransmitting = transmitting;
+    btnSubmit.disabled = transmitting;
+    btnSubmit.querySelector("span").textContent = transmitting ? "SYNCING..." : "TRANSMIT";
   }
 
-  async function sendMessage() {
+  async function sendDirective() {
     const text = userInput.value.trim();
-    if (!text || isGenerating) return;
+    if (!text || isTransmitting) return;
 
-    appendUserMessage(text);
+    appendUserPacket(text);
     userInput.value = "";
-    setGenerating(true);
+    setTransmitting(true);
+
+    // Reset workflow nodes for the new trace
+    resetWorkflowNodes();
+    setNodeState("input", "INGESTING", "running", text);
 
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ message: text }));
@@ -249,20 +327,22 @@ document.addEventListener("DOMContentLoaded", () => {
           body: JSON.stringify({ message: text }),
         });
         const data = await res.json();
-        appendVictorMessage(data.content);
+        appendVictorPacket(data.content);
+        setNodeState("synth", "LOCKED", "locked", "Synthesized response ready");
       } catch (err) {
-        appendVictorMessage(`[COMMUNICATION ERROR]: ${err}`);
+        appendVictorPacket(`[COMMUNICATION ERROR]: ${err}`);
       } finally {
-        setGenerating(false);
+        setTransmitting(false);
       }
     }
   }
 
-  // Clear chat
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      chatLog.innerHTML = "";
-      appendVictorMessage("Context memory cleared. Node ready.");
+  // Clear feed
+  if (btnClearFeed) {
+    btnClearFeed.addEventListener("click", () => {
+      messageStream.innerHTML = "";
+      appendVictorPacket("Memory feed wiped. Ready for new input.");
+      resetWorkflowNodes();
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -271,20 +351,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Quick chip click
-  document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("cmd-chip") && e.target.dataset.prompt) {
-      userInput.value = e.target.dataset.prompt;
-      sendMessage();
-    }
+  // Quick Action Chips
+  document.querySelectorAll(".chip-action").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const cmd = btn.dataset.cmd;
+      if (cmd) {
+        userInput.value = cmd;
+        sendDirective();
+      }
+    });
   });
 
-  sendBtn.addEventListener("click", sendMessage);
+  btnSubmit.addEventListener("click", sendDirective);
 
   userInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      sendMessage();
+      sendDirective();
     }
   });
 
