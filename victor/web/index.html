@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VICTOR — The Artificial Soul</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-badge">V</div>
+        <div class="brand-text">
+          <div class="brand-title">VICTOR</div>
+          <div class="brand-sub">ARTIFICIAL SOUL</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="chat">
+          <span class="nav-icon">💬</span>
+          <span class="nav-label">Chat</span>
+        </button>
+        <button class="nav-item" data-tab="workflow">
+          <span class="nav-icon">⚡</span>
+          <span class="nav-label">Workflow</span>
+          <span class="badge-tag">v0.2</span>
+        </button>
+        <button class="nav-item" data-tab="tools">
+          <span class="nav-icon">🔧</span>
+          <span class="nav-label">Tools</span>
+          <span id="tools-count-badge" class="badge-count">5</span>
+        </button>
+        <button class="nav-item" data-tab="memory">
+          <span class="nav-icon">🧠</span>
+          <span class="nav-label">Memory</span>
+          <span class="badge-tag">v0.3</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="soul-stats">
+          <div class="stat-row">
+            <span class="stat-label">HARNESS:</span>
+            <span class="stat-val mono">v0.1.0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">CURIOSITY:</span>
+            <span class="stat-val cyan">HIGH</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <h1 class="header-title">VICTOR</h1>
+          <span class="header-tagline">"A small artificial mind with a world of tools."</span>
+        </div>
+        <div class="header-right">
+          <div id="connection-status" class="status-indicator online">
+            <span class="status-dot"></span>
+            <span class="status-text">ONLINE</span>
+          </div>
+          <div id="model-badge" class="model-badge">
+            <span class="model-label">MODEL:</span>
+            <span id="active-model-name" class="mono">qwen2:1.5b</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- View Container -->
+      <div class="views-wrapper">
+        <!-- Chat Tab View -->
+        <section id="chat-tab" class="view-tab active">
+          <div id="chat-messages" class="chat-history">
+            <!-- Messages will be injected dynamically -->
+            <div class="message-card victor-message greeting-card">
+              <div class="msg-avatar">V</div>
+              <div class="msg-body">
+                <div class="msg-header">
+                  <span class="msg-author">Victor</span>
+                  <span class="msg-time">System Ready</span>
+                </div>
+                <div class="msg-text">
+                  I am awake. My artificial mind is currently interfaced with my local tool harness.
+                  <br><br>
+                  You can speak with me naturally, ask me to search the web, calculate math, read files, or trigger direct commands like <code>/tools</code>, <code>/calc</code>, or <code>/search</code>.
+                </div>
+                <div class="quick-prompts">
+                  <button class="chip-btn" data-prompt="/tools">/tools</button>
+                  <button class="chip-btn" data-prompt="/calc sqrt(144) + 15 * 2">/calc sqrt(144) + 15 * 2</button>
+                  <button class="chip-btn" data-prompt="Search the web for latest compiler optimization advances">Search compiler news</button>
+                  <button class="chip-btn" data-prompt="/file config/victor.yaml">Read config</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Footer -->
+          <div class="input-container">
+            <div class="input-wrapper">
+              <button id="voice-btn" class="icon-btn" title="Voice Input (STT preview in v0.4)">
+                🎙
+              </button>
+              <textarea
+                id="user-input"
+                rows="1"
+                placeholder="Talk with Victor or enter a command (e.g. /calc, /search, /file)..."
+              ></textarea>
+              <button id="send-btn" class="send-btn" title="Send message">
+                <span>Send</span>
+                <span class="key-hint">⏎</span>
+              </button>
+            </div>
+            <div class="input-hints">
+              <span>Enter to send, Shift+Enter for newline</span>
+              <span class="security-chip">🛡 Safe by default</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tools Tab View -->
+        <section id="tools-tab" class="view-tab">
+          <div class="panel-header">
+            <h2>Installed Capabilities & Tool Harness</h2>
+            <p>Every tool conforms to Victor's standardized execution interface with strict permission gating.</p>
+          </div>
+          <div id="tools-list-container" class="tools-grid">
+            <!-- Dynamic tools rendered here -->
+          </div>
+        </section>
+
+        <!-- Workflow Tab View (v0.2 Preview) -->
+        <section id="workflow-tab" class="view-tab">
+          <div class="panel-header">
+            <h2>Live Workflow Visualizer</h2>
+            <p>Real-time execution DAG showing Victor's planning, tool invocations, and synthesis.</p>
+          </div>
+          <div class="workflow-canvas-placeholder">
+            <div class="canvas-node user-node">USER REQUEST</div>
+            <div class="canvas-line">│</div>
+            <div class="canvas-node planner-node">VICTOR PLANNING</div>
+            <div class="canvas-branch">
+              <div class="branch-line">┌──────────────┴──────────────┐</div>
+              <div class="branch-nodes">
+                <div class="canvas-node tool-node">WEB SEARCH</div>
+                <div class="canvas-node tool-node">MEMORY / FILES</div>
+              </div>
+              <div class="branch-line">└──────────────┬──────────────┘</div>
+            </div>
+            <div class="canvas-node synth-node">SYNTHESIS & RESPONSE</div>
+            <p class="workflow-note mono">⚡ Full dynamic React Flow execution graph arriving in Version 0.2.</p>
+          </div>
+        </section>
+
+        <!-- Settings Tab View -->
+        <section id="settings-tab" class="view-tab">
+          <div class="panel-header">
+            <h2>Victor System Configuration</h2>
+            <p>Control the model layer, personality parameters, and safety permissions.</p>
+          </div>
+          <div class="settings-card">
+            <div class="setting-item">
+              <label>Active Model Provider</label>
+              <div class="setting-desc">Local Ollama instance running at <code>http://127.0.0.1:11434</code></div>
+              <input type="text" class="input-field" value="qwen2:1.5b" readonly />
+            </div>
+            <div class="setting-item">
+              <label>Personality Traits</label>
+              <div class="setting-desc">Curiosity: High | Humor: Medium | Formality: Low</div>
+            </div>
+            <div class="setting-item">
+              <label>Shell Execution (DANGEROUS)</label>
+              <div class="setting-desc">Requires explicit user permission in config/victor.yaml before execution.</div>
+              <span class="danger-badge">RESTRICTED</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
