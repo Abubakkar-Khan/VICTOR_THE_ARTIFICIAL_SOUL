@@ -47,8 +47,8 @@ async def test_agent_tools_listing_command():
     agent = VictorAgent(llm=MockLLM())
     res = await agent.chat("/tools")
     assert res["type"] == "command_result"
-    assert "calculator" in res["content"]
-    assert "web_search" in res["content"]
+    assert "calculator" in res["content"].lower()
+    assert "web_search" in res["content"].lower()
 
 
 @pytest.mark.asyncio

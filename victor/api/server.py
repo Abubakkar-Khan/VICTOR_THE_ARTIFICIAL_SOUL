@@ -47,8 +47,19 @@ async def root():
 
 @app.get("/api/status")
 async def get_status():
-    is_online = await agent.llm.is_available()
-    active_model = await agent.llm.resolve_active_model() if hasattr(agent.llm, "resolve_active_model") else agent.config.model.name
+    try:
+        is_online = await asyncio.wait_for(agent.llm.is_available(), timeout=1.0)
+    except Exception:
+        is_online = False
+
+    try:
+        if hasattr(agent.llm, "resolve_active_model"):
+            active_model = await asyncio.wait_for(agent.llm.resolve_active_model(), timeout=1.0)
+        else:
+            active_model = agent.config.model.name
+    except Exception:
+        active_model = agent.config.model.name
+
     return {
         "name": agent.config.name,
         "title": agent.config.title,

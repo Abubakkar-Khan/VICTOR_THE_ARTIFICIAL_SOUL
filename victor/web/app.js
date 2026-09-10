@@ -1,52 +1,49 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const chatMessages = document.getElementById("chat-messages");
+  const chatLog = document.getElementById("chat-log");
   const userInput = document.getElementById("user-input");
   const sendBtn = document.getElementById("send-btn");
+  const clearBtn = document.getElementById("clear-chat-btn");
   const statusIndicator = document.getElementById("connection-status");
   const activeModelName = document.getElementById("active-model-name");
-  const toolsCountBadge = document.getElementById("tools-count-badge");
-  const toolsListContainer = document.getElementById("tools-list-container");
+  const toolsList = document.getElementById("tools-list");
 
   let socket = null;
   let isGenerating = false;
-  let currentToolCard = null;
+  let activeToolCard = null;
 
-  // Tab navigation
-  document.querySelectorAll(".nav-item").forEach((btn) => {
+  // Tab switching
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".view-tab").forEach((tab) => tab.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach((p) => p.classList.remove("active"));
 
       btn.classList.add("active");
-      const targetId = `${btn.dataset.tab}-tab`;
-      const targetView = document.getElementById(targetId);
-      if (targetView) targetView.classList.add("active");
+      const target = document.getElementById(`${btn.dataset.tab}-tab`);
+      if (target) target.classList.add("active");
     });
   });
 
-  // Fetch initial status and tools
+  // Fetch status
   async function loadStatus() {
     try {
       const res = await fetch("/api/status");
       if (res.ok) {
         const data = await res.json();
-        activeModelName.textContent = data.model || "qwen2:1.5b";
-        toolsCountBadge.textContent = data.tools_count;
+        activeModelName.textContent = (data.model || "QWEN2:1.5B").toUpperCase();
         if (data.status === "online") {
-          statusIndicator.classList.remove("offline");
-          statusIndicator.classList.add("online");
-          statusIndicator.querySelector(".status-text").textContent = "ONLINE";
+          statusIndicator.className = "meta-badge online";
+          statusIndicator.querySelector(".meta-text").textContent = "ONLINE";
         } else {
-          statusIndicator.classList.remove("online");
-          statusIndicator.classList.add("offline");
-          statusIndicator.querySelector(".status-text").textContent = "OFFLINE";
+          statusIndicator.className = "meta-badge offline";
+          statusIndicator.querySelector(".meta-text").textContent = "OFFLINE";
         }
       }
     } catch (e) {
-      console.warn("Status check failed:", e);
+      console.warn("Status offline:", e);
     }
   }
 
+  // Fetch tools
   async function loadTools() {
     try {
       const res = await fetch("/api/tools");
@@ -55,30 +52,30 @@ document.addEventListener("DOMContentLoaded", () => {
         renderTools(data.tools || []);
       }
     } catch (e) {
-      console.warn("Load tools failed:", e);
+      console.warn("Tools load failed:", e);
     }
   }
 
   function renderTools(tools) {
-    if (!toolsListContainer) return;
-    toolsListContainer.innerHTML = "";
+    if (!toolsList) return;
+    toolsList.innerHTML = "";
     tools.forEach((tool) => {
-      const card = document.createElement("div");
-      card.className = "tool-card";
-      const shortcut = tool.slash_command ? `<div class="tool-shortcut">${tool.slash_command}</div>` : "";
-      card.innerHTML = `
-        <div class="tool-card-head">
-          <span class="tool-title">${tool.name}</span>
-          <span class="perm-pill ${tool.permission}">${tool.permission}</span>
+      const box = document.createElement("div");
+      box.className = "retro-tool-box";
+      const shortcut = tool.slash_command ? `<span class="box-shortcut">CMD: ${tool.slash_command}</span>` : "";
+      box.innerHTML = `
+        <div class="box-head">
+          <span class="box-tool-name">${tool.name.toUpperCase()}</span>
+          <span class="box-perm ${tool.permission}">[${tool.permission}]</span>
         </div>
-        <p class="tool-desc">${tool.description}</p>
+        <div class="box-desc">${escapeHtml(tool.description)}</div>
         ${shortcut}
       `;
-      toolsListContainer.appendChild(card);
+      toolsList.appendChild(box);
     });
   }
 
-  // WebSocket Connection
+  // WebSocket
   function initWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
@@ -86,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log("[Victor] WebSocket connected");
+      console.log("[VICTOR] WebSocket link established");
     };
 
     socket.onmessage = (event) => {
@@ -94,12 +91,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const payload = JSON.parse(event.data);
         handleServerEvent(payload);
       } catch (err) {
-        console.error("Error parsing message", err);
+        console.error("Message parse error", err);
       }
     };
 
     socket.onclose = () => {
-      console.warn("[Victor] WebSocket disconnected, reconnecting in 3s...");
       setTimeout(initWebSocket, 3000);
     };
   }
@@ -110,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (evt.topic === "tool.started") {
         createToolCard(evt.data.tool, evt.data.parameters);
       } else if (evt.topic === "tool.completed") {
-        completeToolCard(evt.data.tool, evt.data.duration, evt.data.output);
+        finishToolCard(evt.data.tool, evt.data.duration, evt.data.output);
       } else if (evt.topic === "tool.failed") {
         failToolCard(evt.data.tool, evt.data.error, evt.data.output);
       }
@@ -122,84 +118,91 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function createToolCard(toolName, parameters) {
     const card = document.createElement("div");
-    card.className = "tool-execution-card running";
+    card.className = "retro-tool-card running";
     card.innerHTML = `
-      <div class="tool-header-line">
-        <span>┌ Executing: ${toolName}...</span>
-        <span class="tool-duration">Running</span>
+      <div class="tool-top-bar">
+        <span>┌── [ EXEC: ${toolName.toUpperCase()} ]</span>
+        <span>STATUS: BUSY</span>
       </div>
-      <div class="tool-details-content">${JSON.stringify(parameters, null, 2)}</div>
+      <div class="tool-body-content">&gt; PARAMS: ${JSON.stringify(parameters)}</div>
     `;
-    chatMessages.appendChild(card);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    currentToolCard = card;
+    chatLog.appendChild(card);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    activeToolCard = card;
   }
 
-  function completeToolCard(toolName, duration, output) {
-    if (currentToolCard) {
-      currentToolCard.className = "tool-execution-card success";
-      const durationText = duration !== undefined ? `${duration}s` : "";
-      currentToolCard.querySelector(".tool-header-line").innerHTML = `
-        <span>└ ${toolName} completed</span>
-        <span class="tool-duration">${durationText}</span>
+  function finishToolCard(toolName, duration, output) {
+    if (activeToolCard) {
+      activeToolCard.className = "retro-tool-card success";
+      const durText = duration !== undefined ? `${duration}s` : "";
+      activeToolCard.querySelector(".tool-top-bar").innerHTML = `
+        <span>├── [ FINISHED: ${toolName.toUpperCase()} ]</span>
+        <span>TIME: ${durText}</span>
       `;
       let preview = "";
       if (typeof output === "object") {
-        preview = JSON.stringify(output, null, 2);
+        if (output.formatted) {
+          preview = output.formatted;
+        } else if (output.results) {
+          preview = output.results.map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}`).join("\n");
+        } else {
+          preview = JSON.stringify(output, null, 2);
+        }
       } else {
         preview = String(output);
       }
-      if (preview.length > 300) {
-        preview = preview.slice(0, 300) + "... [truncated]";
+      if (preview.length > 500) {
+        preview = preview.slice(0, 500) + "... [truncated]";
       }
-      currentToolCard.querySelector(".tool-details-content").textContent = preview;
+      activeToolCard.querySelector(".tool-body-content").textContent = preview;
     }
   }
 
   function failToolCard(toolName, error, output) {
-    if (currentToolCard) {
-      currentToolCard.className = "tool-execution-card failed";
-      currentToolCard.querySelector(".tool-header-line").innerHTML = `
-        <span style="color:var(--danger-red)">└ ${toolName} failed: ${error || "Error"}</span>
+    if (activeToolCard) {
+      activeToolCard.className = "retro-tool-card failed";
+      activeToolCard.querySelector(".tool-top-bar").innerHTML = `
+        <span style="color:var(--red-alert)">├── [ FAILED: ${toolName.toUpperCase()} ]</span>
+        <span style="color:var(--red-alert)">ERR: ${error || "FAIL"}</span>
       `;
-      currentToolCard.querySelector(".tool-details-content").textContent = String(output);
+      activeToolCard.querySelector(".tool-body-content").textContent = String(output);
     }
   }
 
   function appendUserMessage(text) {
     const msg = document.createElement("div");
-    msg.className = "message-card user-message";
-    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    msg.className = "term-msg user-entry";
+    const time = new Date().toTimeString().split(" ")[0];
     msg.innerHTML = `
-      <div class="msg-avatar">U</div>
-      <div class="msg-body">
-        <div class="msg-header">
-          <span class="msg-author">You</span>
-          <span class="msg-time">${time}</span>
-        </div>
-        <div class="msg-text">${escapeHtml(text)}</div>
+      <div class="msg-wire">
+        <span class="wire-label">[ USER // IN ]</span>
+        <span class="wire-time">${time}</span>
       </div>
+      <div class="msg-content">${escapeHtml(stripEmojis(text))}</div>
     `;
-    chatMessages.appendChild(msg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatLog.appendChild(msg);
+    chatLog.scrollTop = chatLog.scrollHeight;
   }
 
   function appendVictorMessage(text) {
     const msg = document.createElement("div");
-    msg.className = "message-card victor-message";
-    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    msg.className = "term-msg victor-entry";
+    const time = new Date().toTimeString().split(" ")[0];
+    const cleaned = stripEmojis(text);
     msg.innerHTML = `
-      <div class="msg-avatar">V</div>
-      <div class="msg-body">
-        <div class="msg-header">
-          <span class="msg-author">Victor</span>
-          <span class="msg-time">${time}</span>
-        </div>
-        <div class="msg-text">${formatMarkdown(text)}</div>
+      <div class="msg-wire">
+        <span class="wire-label">[ VICTOR // OUT ]</span>
+        <span class="wire-time">${time}</span>
       </div>
+      <div class="msg-content">${formatContent(cleaned)}</div>
     `;
-    chatMessages.appendChild(msg);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatLog.appendChild(msg);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function stripEmojis(str) {
+    if (!str) return "";
+    return str.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, "");
   }
 
   function escapeHtml(str) {
@@ -211,18 +214,13 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/'/g, "&#039;");
   }
 
-  function formatMarkdown(str) {
+  function formatContent(str) {
     if (!str) return "";
     let clean = escapeHtml(str);
-    // Format code blocks
     clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-      return `<pre><code class="${lang}">${code.trim()}</code></pre>`;
+      return `<pre><code>${code.trim()}</code></pre>`;
     });
-    // Format inline code
     clean = clean.replace(/`([^`]+)`/g, "<code>$1</code>");
-    // Format bold
-    clean = clean.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    // Format links
     clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     return clean;
   }
@@ -230,11 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function setGenerating(generating) {
     isGenerating = generating;
     sendBtn.disabled = generating;
-    if (generating) {
-      sendBtn.querySelector("span").textContent = "...";
-    } else {
-      sendBtn.querySelector("span").textContent = "Send";
-    }
+    sendBtn.textContent = generating ? "[ BUSY... ]" : "[ EXEC ⏎ ]";
   }
 
   async function sendMessage() {
@@ -243,13 +237,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     appendUserMessage(text);
     userInput.value = "";
-    userInput.style.height = "auto";
     setGenerating(true);
 
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ message: text }));
     } else {
-      // Fallback to REST endpoint
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -259,39 +251,44 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         appendVictorMessage(data.content);
       } catch (err) {
-        appendVictorMessage(`Encountered error communicating with Victor core: ${err}`);
+        appendVictorMessage(`[COMMUNICATION ERROR]: ${err}`);
       } finally {
         setGenerating(false);
       }
     }
   }
 
-  // Quick chip click handlers
+  // Clear chat
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      chatLog.innerHTML = "";
+      appendVictorMessage("Context memory cleared. Node ready.");
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "/clear", reset: true }),
+      });
+    });
+  }
+
+  // Quick chip click
   document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("chip-btn")) {
-      const prompt = e.target.dataset.prompt;
-      if (prompt) {
-        userInput.value = prompt;
-        sendMessage();
-      }
+    if (e.target.classList.contains("cmd-chip") && e.target.dataset.prompt) {
+      userInput.value = e.target.dataset.prompt;
+      sendMessage();
     }
   });
 
   sendBtn.addEventListener("click", sendMessage);
 
   userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       e.preventDefault();
       sendMessage();
     }
   });
 
-  userInput.addEventListener("input", () => {
-    userInput.style.height = "auto";
-    userInput.style.height = Math.min(userInput.scrollHeight, 120) + "px";
-  });
-
-  // Initialize
+  // Init
   loadStatus();
   loadTools();
   initWebSocket();

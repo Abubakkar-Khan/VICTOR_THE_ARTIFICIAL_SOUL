@@ -30,7 +30,7 @@ class OllamaProvider(BaseLLM):
     async def list_available_models(self) -> List[str]:
         """Fetch list of available model tags from Ollama."""
         try:
-            async with httpx.AsyncClient(timeout=4.0) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=1.5) as client:
                 res = await client.get(f"{self.api_base}/api/tags")
                 if res.status_code == 200:
                     data = res.json()
@@ -72,7 +72,7 @@ class OllamaProvider(BaseLLM):
     async def is_available(self) -> bool:
         """Check if Ollama is running and responding."""
         try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=1.5) as client:
                 res = await client.get(f"{self.api_base}/api/tags")
                 return res.status_code == 200
         except Exception:

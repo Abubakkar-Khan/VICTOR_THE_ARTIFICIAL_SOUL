@@ -14,6 +14,79 @@ from victor.tools.factory import create_tool_registry
 from victor.tools.registry import ToolRegistry
 
 
+def strip_emojis(text: str) -> str:
+    """Purge emojis and pictorial symbols for a clean retro-cyber terminal aesthetic."""
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticons
+        "\U0001F300-\U0001F5FF"  # symbols & pictographs
+        "\U0001F680-\U0001F6FF"  # transport & map symbols
+        "\U0001F1E0-\U0001F1FF"  # flags
+        "\U00002702-\U000027B0"
+        "\U000024C2-\U0001F251"
+        "\U0001F900-\U0001F9FF"  # supplemental symbols
+        "\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-a
+        "]+",
+        flags=re.UNICODE,
+    )
+    cleaned = emoji_pattern.sub("", text)
+    return re.sub(r"  +", " ", cleaned)
+
+
+def format_tool_display(tool_name: str, result: ToolResult) -> str:
+    """Format tool execution output into a clean, human-readable retro-cyber presentation."""
+    if not result.success:
+        return f"[ERROR // {tool_name}]: {result.output}"
+
+    out = result.output
+    if tool_name == "calculator" and isinstance(out, dict):
+        expr = out.get("expression", "")
+        res = out.get("result", "")
+        return f"> CALC: {expr} = {res}"
+
+    elif tool_name == "web_search" and isinstance(out, dict):
+        query = out.get("query", "")
+        hits = out.get("results", [])
+        if not hits:
+            return f"> SEARCH: No matches found for \"{query}\"."
+        lines = [f"> SEARCH // \"{query}\" ({len(hits)} results)\n"]
+        for idx, item in enumerate(hits, 1):
+            title = item.get("title", "")
+            url = item.get("url", "")
+            snippet = item.get("snippet", "")
+            lines.append(f"[{idx:02d}] {title}\n     URL: {url}\n     {snippet}\n")
+        return "\n".join(lines).strip()
+
+    elif tool_name == "browser" and isinstance(out, dict):
+        title = out.get("title", "")
+        url = out.get("url", "")
+        content = out.get("content", "")
+        return (
+            f"> BROWSE // {title}\n"
+            f"SOURCE: {url}\n\n"
+            f"{content[:800]}..."
+        )
+
+    elif tool_name == "filesystem" and isinstance(out, dict):
+        path = out.get("path", "")
+        lines_count = out.get("total_lines", 0)
+        content = out.get("content", "")
+        return (
+            f"> FILE // {path} ({lines_count} lines)\n"
+            f"----------------------------------------\n"
+            f"{content[:1200]}"
+        )
+
+    elif tool_name == "shell" and isinstance(out, dict):
+        cmd = out.get("command", "")
+        stdout = out.get("stdout", "")
+        stderr = out.get("stderr", "")
+        res_text = stdout if stdout else stderr
+        return f"> SHELL // {cmd}\n{res_text}"
+
+    return result.to_summary_string(max_length=1500)
+
+
 class VictorAgent:
     """The artificial soul living harness, unifying personality, LLM inference, and tool execution."""
 
@@ -91,23 +164,25 @@ class VictorAgent:
 
         if command in ["/help", "/commands"]:
             lines = [
-                f"**Victor — Available Commands**",
-                "- `/tools` : List all installed tools and permission levels",
-                "- `/clear` : Clear current conversation history",
-                "- `/info`  : Display Victor's active model and personality configuration",
+                "[COMMAND INTERFACE]",
+                "- /tools       :: list installed tool modules",
+                "- /clear       :: wipe conversation memory",
+                "- /info        :: query system node profile",
+                "- /calc <expr> :: compute mathematical expression",
+                "- /search <q>  :: query live web index",
+                "- /browse <url>:: extract webpage article text",
+                "- /file <path> :: read workspace file",
+                "- /shell <cmd> :: execute shell command (restricted)",
             ]
-            for tool in self.registry.list_tools():
-                if tool.slash_command:
-                    lines.append(f"- `{tool.slash_command} <args>` : {tool.description} [{tool.permission.value}]")
             output_text = "\n".join(lines)
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": output_text, "tool_executed": None}
 
         if command == "/tools":
-            lines = [f"**Installed Tools ({len(self.registry.list_tools())}):**\n"]
+            lines = [f"[REGISTERED CAPABILITIES // {len(self.registry.list_tools())} TOOLS]\n"]
             for tool in self.registry.list_tools():
-                slash = f" (Shortcut: `{tool.slash_command}`)" if tool.slash_command else ""
-                lines.append(f"• **{tool.name}** [{tool.permission.value}]{slash}\n  {tool.description}")
+                slash = f" ({tool.slash_command})" if tool.slash_command else ""
+                lines.append(f"- {tool.name.upper():<12} [{tool.permission.value:<10}]{slash} :: {tool.description}")
             output_text = "\n".join(lines)
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": output_text, "tool_executed": None}
@@ -115,18 +190,19 @@ class VictorAgent:
         if command == "/clear":
             self.reset_conversation()
             await self.event_bus.emit("agent.completed", duration=0.0)
-            return {"type": "command_result", "content": "Conversation history cleared.", "tool_executed": None}
+            return {"type": "command_result", "content": "[SYSTEM]: Context memory cleared.", "tool_executed": None}
 
         if command == "/info":
             active_model = await self.llm.resolve_active_model() if hasattr(self.llm, "resolve_active_model") else self.llm.model_name
             is_ready = await self.llm.is_available()
             info_text = (
-                f"**Victor Profile**\n"
-                f"- Name: {self.config.name} ({self.config.title})\n"
-                f"- Model: `{active_model}` (Status: {'● Online' if is_ready else '○ Offline'})\n"
-                f"- Personality: Curiosity={self.config.personality.curiosity}, Humor={self.config.personality.humor}\n"
-                f"- Shell Allowed: {self.config.security.allow_shell}\n"
-                f"- Registered Tools: {len(self.registry.list_tools())}"
+                f"[NODE PROFILE]\n"
+                f"NODE       : {self.config.name} // {self.config.title}\n"
+                f"MODEL      : {active_model} [STATUS: {'ONLINE' if is_ready else 'OFFLINE'}]\n"
+                f"CURIOSITY  : HIGH\n"
+                f"STYLE      : RETRO-CYBER TERMINAL (NO EMOJIS)\n"
+                f"SHELL EXEC : {'PERMITTED' if self.config.security.allow_shell else 'RESTRICTED'}\n"
+                f"ACTIVE TOOLS: {len(self.registry.list_tools())}"
             )
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": info_text, "tool_executed": None}
@@ -136,11 +212,10 @@ class VictorAgent:
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {
                 "type": "error",
-                "content": f"Unknown command: `{command}`. Type `/help` to see available commands.",
+                "content": f"[UNKNOWN COMMAND]: '{command}'. Enter /help for index.",
                 "tool_executed": None,
             }
 
-        # Map single string argument to primary tool property
         first_prop = next(iter(tool.parameters.get("properties", {}).keys()), "input")
         kwargs = {first_prop: argument}
 
@@ -149,13 +224,10 @@ class VictorAgent:
 
         if result.success:
             await self.event_bus.emit("tool.completed", tool=tool.name, duration=result.duration, output=result.output)
-            formatted = (
-                f"Executed `{tool.name}` in {result.duration}s:\n\n"
-                f"```\n{result.to_summary_string(max_length=2000)}\n```"
-            )
+            formatted = format_tool_display(tool.name, result)
         else:
             await self.event_bus.emit("tool.failed", tool=tool.name, error=result.error, output=result.output)
-            formatted = f"Tool `{tool.name}` failed ({result.error}): {result.output}"
+            formatted = f"[TOOL FAILED // {tool.name}] ({result.error}): {result.output}"
 
         duration = round(time.perf_counter() - start_time, 3)
         await self.event_bus.emit("agent.completed", duration=duration)
@@ -219,10 +291,12 @@ class VictorAgent:
 
             # Add model's action and the tool observation into context
             observation_msg = (
-                f"[Tool Observation from '{tool_name}']:\n"
-                f"{result.to_summary_string(max_length=2500)}\n\n"
-                f"Now synthesize your final answer for the user based on this observation, "
-                f"in your designated Victor persona."
+                f"[TOOL OBSERVATION: {tool_name.upper()}]\n"
+                f"{format_tool_display(tool_name, result)}\n\n"
+                f"INSTRUCTIONS: Synthesize this observation directly for the user. "
+                f"Keep your response short, stylish, and focused (1 to 3 sentences maximum). "
+                f"STRICT RULE: Absolutely NO emojis. Do not output raw JSON. "
+                f"Deliver your final synthesis in character."
             )
 
             synthetic_history = list(self.history)
@@ -236,9 +310,9 @@ class VictorAgent:
                 temperature=self.config.model.temperature,
                 max_tokens=self.config.model.max_tokens,
             )
-            final_content = final_resp.content
+            final_content = strip_emojis(final_resp.content.strip())
         else:
-            final_content = initial_content
+            final_content = strip_emojis(initial_content.strip())
 
         self.history.append(ChatMessage(role="assistant", content=final_content))
         duration = round(time.perf_counter() - start_time, 3)

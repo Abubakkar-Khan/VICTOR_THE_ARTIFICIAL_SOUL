@@ -21,6 +21,8 @@ class BehaviorConfig(BaseModel):
     concise: bool = True
     explain_tools: bool = True
     acknowledge_errors: bool = True
+    no_emojis: bool = True
+    max_response_sentences: int = 3
 
 
 class ModelConfig(BaseModel):
