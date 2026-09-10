@@ -3,220 +3,230 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VICTOR // NERV × NOTHING TERMINAL</title>
+  <title>VICTOR // soulOS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <div class="screen-chassis">
-    <!-- Top Evangelion x Nothing Header -->
-    <header class="tactical-header">
-      <div class="header-brand">
-        <span class="magi-code">MAGI-01</span>
-        <div class="brand-divider"></div>
-        <div class="brand-text">
-          <span class="brand-name">VICTOR</span>
-          <span class="brand-sub">ARTIFICIAL SOUL // NERV-09</span>
-        </div>
+  <!-- Floating Achievement Toast Notification -->
+  <div id="achievement-toast" class="achievement-toast">
+    <div class="achieve-glyph">🏆</div>
+    <div class="achieve-info">
+      <div class="achieve-tag">ACHIEVEMENT UNLOCKED</div>
+      <div id="achieve-title" class="achieve-name">FIRST CONTACT</div>
+    </div>
+  </div>
+
+  <div class="app-viewport">
+    <!-- Gamified Telemetry Navigation Header -->
+    <header class="game-header">
+      <div class="brand-cluster">
+        <span class="soul-pill">soulOS</span>
+        <span class="brand-title">VICTOR</span>
+        <span class="brand-version">v0.1</span>
       </div>
 
-      <!-- Center Telemetry Strip -->
-      <div class="telemetry-strip">
-        <div class="telemetry-item">
-          <span class="t-label">SYNC</span>
-          <span class="t-val">99.8%</span>
+      <!-- Gamified Player Bar (Level, XP, Streak, SFX) -->
+      <div class="gamified-stats">
+        <div class="level-badge" id="level-badge" title="Victor Consciousness Level">
+          <span class="lvl-label">LVL</span>
+          <span id="player-level" class="lvl-number">01</span>
         </div>
-        <div class="telemetry-item">
-          <span class="t-label">STATUS</span>
-          <span class="t-val orange">NORMAL</span>
-        </div>
-        <div class="telemetry-item">
-          <span class="t-label">SAFETY</span>
-          <span class="t-val">LOCKED</span>
-        </div>
-      </div>
 
-      <!-- Right Meta Status -->
-      <div class="header-controls">
-        <div id="conn-pill" class="pill-badge status-online">
-          <span class="pill-dot"></span>
-          <span class="pill-text">ONLINE</span>
+        <div class="xp-container" title="Consciousness Sync XP">
+          <div class="xp-meta">
+            <span id="level-title">SYNAPSE SEED</span>
+            <span id="xp-text">0 / 200 XP</span>
+          </div>
+          <div class="xp-bar-track">
+            <div id="xp-bar-fill" class="xp-bar-fill" style="width: 10%;"></div>
+          </div>
         </div>
-        <div class="pill-badge core-pill">
-          <span class="core-label">CORE:</span>
-          <span id="active-core-model" class="core-val">QWEN2:1.5B</span>
+
+        <div id="streak-pill" class="streak-pill" title="Active Interaction Streak">
+          <span class="streak-flame">🔥</span>
+          <span id="streak-count">1</span>
+          <span class="streak-sub">STREAK</span>
+        </div>
+
+        <button id="sfx-toggle-btn" class="sfx-pill" title="Toggle Web Audio Synthesized SFX">
+          <span class="sfx-icon">🔊</span>
+          <span id="sfx-label">SFX: ON</span>
+        </button>
+
+        <div id="status-pill" class="status-capsule online">
+          <span class="status-beacon"></span>
+          <span class="status-name">ONLINE</span>
         </div>
       </div>
     </header>
 
-    <!-- Sub Navigation Pill Bar -->
-    <div class="nav-dock">
-      <div class="pill-nav">
-        <button class="nav-pill active" data-view="chat">
-          <span class="dot-glyph">::</span> 01_CONVERSATION
+    <!-- Navigation Switcher Tabs -->
+    <div class="view-switch-bar">
+      <div class="switch-tabs">
+        <button class="switch-tab active" data-tab="chat">
+          <span class="tab-index">01</span> CHAT
         </button>
-        <button class="nav-pill" data-view="workflow">
-          <span class="dot-glyph">::</span> 02_LIVE_WORKFLOW
-          <span id="workflow-pulse-dot" class="activity-pip"></span>
+        <button class="switch-tab" data-tab="workflow">
+          <span class="tab-index">02</span> LIVE WORKFLOW
+          <span id="workflow-beacon" class="beacon-dot"></span>
         </button>
-        <button class="nav-pill" data-view="tools">
-          <span class="dot-glyph">::</span> 03_CAPABILITIES
+        <button class="switch-tab" data-tab="tools">
+          <span class="tab-index">03</span> CAPABILITIES
         </button>
       </div>
 
-      <div class="dock-actions">
-        <button class="action-pill chip-action" data-cmd="/calc 144 * 12">/calc</button>
-        <button class="action-pill chip-action" data-cmd="/search compiler optimization">/search</button>
-        <button class="action-pill chip-action" data-cmd="/file config/victor.yaml">/file</button>
-        <button class="action-pill chip-action" data-cmd="/tools">/tools</button>
-        <button id="clear-feed-btn" class="action-pill danger-pill">RESET</button>
+      <!-- Floating Quick Pill Actions -->
+      <div class="pill-actions-dock">
+        <button class="action-capsule quick-chip" data-cmd="/calc 144 * 12">/calc</button>
+        <button class="action-capsule quick-chip" data-cmd="/search compiler optimization">/search</button>
+        <button class="action-capsule quick-chip" data-cmd="/file config/victor.yaml">/file</button>
+        <button class="action-capsule quick-chip" data-cmd="/tools">/tools</button>
+        <button id="spark-prompt-btn" class="action-capsule spark-chip">✨ SPARK</button>
+        <button id="export-chat-btn" class="action-capsule">EXPORT</button>
+        <button id="clear-chat-btn" class="action-capsule danger-chip">RESET</button>
       </div>
     </div>
 
-    <!-- Main Viewport -->
-    <main class="view-surface">
-      <!-- Chat Interface -->
-      <section id="view-chat" class="panel-section active">
-        <div id="message-stream" class="message-stream">
-          <!-- Initial Welcome Node -->
-          <div class="speech-packet victor-packet">
-            <div class="packet-head">
-              <span class="packet-author">VICTOR</span>
-              <span class="packet-time">00:00:00</span>
-              <span class="packet-sig">SIG: INITIAL_READY</span>
-            </div>
-            <div class="packet-body">
-              Victor is online. Cognitive harness interfaced with 5 local capabilities. 
-              Ask a question, request a web search, calculate math, or inspect files.
+    <!-- Main Content Area -->
+    <main class="content-surface">
+      <!-- Chat Interface (Completely Borderless Conversation) -->
+      <section id="panel-chat" class="tab-panel active">
+        <div id="chat-stream" class="chat-stream">
+          <!-- Welcome Message (Borderless) -->
+          <div class="convo-row victor-row">
+            <div class="convo-avatar">V</div>
+            <div class="convo-content">
+              <div class="convo-header">
+                <span class="convo-sender">Victor</span>
+                <span class="convo-time">Ready</span>
+              </div>
+              <div class="convo-text">
+                Victor is awake. My mind is linked to 5 local capabilities.
+                Ask me anything, have me search the web, calculate math, or inspect files.
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Sleek Bottom Input Dock -->
-        <div class="dock-input-tray">
-          <div class="input-enclosure">
-            <span class="input-glyph">&gt;</span>
+        <!-- Floating Input Dock -->
+        <div class="input-floating-tray">
+          <div class="input-capsule">
+            <span class="input-arrow">⚡</span>
             <input
               type="text"
-              id="user-input"
-              placeholder="Enter message or directive (/calc, /search, /file, /tools)..."
+              id="chat-input"
+              placeholder="Talk with Victor or enter a command (/calc, /search, /file)..."
               autocomplete="off"
               spellcheck="false"
             />
-            <button id="btn-submit" class="pill-btn-send">
-              <span>TRANSMIT</span>
-              <span class="key-hint">⏎</span>
+            <button id="btn-send" class="send-capsule">
+              <span>SEND</span>
+              <span class="send-hint">⏎</span>
             </button>
           </div>
         </div>
       </section>
 
       <!-- Live Interactive Workflow Interface -->
-      <section id="view-workflow" class="panel-section">
-        <div class="workflow-header-bar">
-          <div class="wh-left">
-            <span class="wh-title">// LIVE PIPELINE GRAPH</span>
-            <span class="wh-sub">REAL-TIME TELEMETRY TRACE &amp; SIGNAL PROPAGATION</span>
+      <section id="panel-workflow" class="tab-panel">
+        <div class="workflow-top-bar">
+          <div class="wf-title-block">
+            <span class="wf-headline">LIVE EXECUTION GRAPH</span>
+            <span class="wf-subline">REAL-TIME TELEMETRY &amp; PACKET FLOW</span>
           </div>
-          <div class="wh-right">
-            <span class="wh-metric">LAST LATENCY: <span id="pipeline-last-time">0.00s</span></span>
-            <button id="btn-replay-trace" class="action-pill">RESET NODES</button>
+          <div class="wf-metrics-block">
+            <span class="latency-pill">LATENCY: <strong id="wf-latency">0.00s</strong></span>
+            <button id="reset-graph-btn" class="action-capsule">RESET NODES</button>
           </div>
         </div>
 
-        <div class="workflow-stage">
-          <!-- SVG Signal Lines Layer -->
-          <svg class="workflow-svg-layer" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="wire-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#ff6600" />
-                <stop offset="100%" stop-color="#ff9900" />
-              </linearGradient>
-            </defs>
-            <!-- Paths drawn dynamically or positioned cleanly -->
-            <path id="path-1-2" class="signal-wire" d="M 120,70 L 120,120" />
-            <path id="path-2-3" class="signal-wire" d="M 120,170 L 120,220" />
-            <path id="path-3-4" class="signal-wire" d="M 120,270 L 120,320" />
-            <path id="path-4-5" class="signal-wire" d="M 120,370 L 120,420" />
+        <div class="workflow-canvas-wrap">
+          <!-- Animated Signal Connections -->
+          <svg class="wf-svg-layer" preserveAspectRatio="none">
+            <path id="wire-1-2" class="wf-wire" d="M 160,75 L 160,135" />
+            <path id="wire-2-3" class="wf-wire" d="M 160,195 L 160,255" />
+            <path id="wire-3-4" class="wf-wire" d="M 160,315 L 160,375" />
+            <path id="wire-4-5" class="wf-wire" d="M 160,435 L 160,495" />
           </svg>
 
-          <!-- Nodes Flow Container -->
-          <div class="nodes-column">
+          <!-- Vertical Pipeline Nodes -->
+          <div class="pipeline-column">
             <!-- Node 1: Input -->
-            <div id="node-input" class="magi-node" data-node="input">
-              <div class="node-tag">NODE 01 // INGESTION</div>
-              <div class="node-content">
-                <div class="node-name">USER DIRECTIVE</div>
-                <div class="node-preview" id="preview-input">Awaiting transmit...</div>
+            <div id="wf-node-input" class="pipeline-card" data-node="input">
+              <div class="p-card-tag">01 // INGESTION</div>
+              <div class="p-card-main">
+                <div class="p-card-title">USER DIRECTIVE</div>
+                <div class="p-card-desc" id="wf-desc-input">Standing by for input...</div>
               </div>
-              <div class="node-status-pill standby" id="status-node-input">STANDBY</div>
+              <div class="p-card-status standby" id="wf-status-input">STANDBY</div>
             </div>
 
             <!-- Node 2: Magi Planner -->
-            <div id="node-magi" class="magi-node" data-node="magi">
-              <div class="node-tag">NODE 02 // MAGI-CORE</div>
-              <div class="node-content">
-                <div class="node-name">COGNITIVE PLANNER</div>
-                <div class="node-preview" id="preview-magi">Decision Matrix: Idle</div>
+            <div id="wf-node-magi" class="pipeline-card" data-node="magi">
+              <div class="p-card-tag">02 // COGNITIVE CORE</div>
+              <div class="p-card-main">
+                <div class="p-card-title">PLANNER &amp; ROUTER</div>
+                <div class="p-card-desc" id="wf-desc-magi">Decision Matrix: Idle</div>
               </div>
-              <div class="node-status-pill standby" id="status-node-magi">STANDBY</div>
+              <div class="p-card-status standby" id="wf-status-magi">STANDBY</div>
             </div>
 
-            <!-- Node 3: Tool Dispatcher -->
-            <div id="node-tool" class="magi-node" data-node="tool">
-              <div class="node-tag">NODE 03 // HARNESS</div>
-              <div class="node-content">
-                <div class="node-name">TOOL EXECUTION</div>
-                <div class="node-preview" id="preview-tool">No tool triggered</div>
+            <!-- Node 3: Tool Execution -->
+            <div id="wf-node-tool" class="pipeline-card" data-node="tool">
+              <div class="p-card-tag">03 // TOOL HARNESS</div>
+              <div class="p-card-main">
+                <div class="p-card-title">CAPABILITY EXECUTION</div>
+                <div class="p-card-desc" id="wf-desc-tool">No capability engaged</div>
               </div>
-              <div class="node-status-pill standby" id="status-node-tool">STANDBY</div>
+              <div class="p-card-status standby" id="wf-status-tool">STANDBY</div>
             </div>
 
-            <!-- Node 4: Telemetry Observation -->
-            <div id="node-obs" class="magi-node" data-node="obs">
-              <div class="node-tag">NODE 04 // TELEMETRY</div>
-              <div class="node-content">
-                <div class="node-name">OBSERVATION &amp; DATA</div>
-                <div class="node-preview" id="preview-obs">Observation buffer empty</div>
+            <!-- Node 4: Observation Buffer -->
+            <div id="wf-node-obs" class="pipeline-card" data-node="obs">
+              <div class="p-card-tag">04 // TELEMETRY DATA</div>
+              <div class="p-card-main">
+                <div class="p-card-title">OBSERVATION BUFFER</div>
+                <div class="p-card-desc" id="wf-desc-obs">Buffer empty</div>
               </div>
-              <div class="node-status-pill standby" id="status-node-obs">STANDBY</div>
+              <div class="p-card-status standby" id="wf-status-obs">STANDBY</div>
             </div>
 
-            <!-- Node 5: Output Synthesis -->
-            <div id="node-synth" class="magi-node" data-node="synth">
-              <div class="node-tag">NODE 05 // SYNTHESIS</div>
-              <div class="node-content">
-                <div class="node-name">NATURAL RECURSION</div>
-                <div class="node-preview" id="preview-synth">Awaiting payload</div>
+            <!-- Node 5: Recursive Synthesis -->
+            <div id="wf-node-synth" class="pipeline-card" data-node="synth">
+              <div class="p-card-tag">05 // RECURSION</div>
+              <div class="p-card-main">
+                <div class="p-card-title">NATURAL SYNTHESIS</div>
+                <div class="p-card-desc" id="wf-desc-synth">Awaiting observation</div>
               </div>
-              <div class="node-status-pill standby" id="status-node-synth">STANDBY</div>
+              <div class="p-card-status standby" id="wf-status-synth">STANDBY</div>
             </div>
           </div>
 
-          <!-- Slide-out Node Inspector Panel -->
-          <aside id="node-inspector" class="node-inspector">
-            <div class="inspector-header">
-              <span class="inspector-title">// TELEMETRY INSPECTOR</span>
-              <button id="close-inspector-btn" class="pill-badge close-btn">✕</button>
+          <!-- Slide-out Telemetry Inspector Drawer -->
+          <aside id="telemetry-drawer" class="telemetry-drawer">
+            <div class="drawer-header">
+              <span class="drawer-title">// TELEMETRY INSPECTOR</span>
+              <button id="close-drawer-btn" class="drawer-close">✕</button>
             </div>
-            <div class="inspector-body">
-              <div class="insp-item">
-                <label>SELECTED NODE</label>
-                <div id="insp-node-name" class="insp-val">-</div>
+            <div class="drawer-body">
+              <div class="drawer-field">
+                <label>NODE DESIGNATION</label>
+                <div id="drawer-node-name" class="drawer-val">-</div>
               </div>
-              <div class="insp-item">
-                <label>LIVE STATUS</label>
-                <div id="insp-node-status" class="insp-val orange">-</div>
+              <div class="drawer-field">
+                <label>OPERATIONAL STATUS</label>
+                <div id="drawer-node-status" class="drawer-val highlight">-</div>
               </div>
-              <div class="insp-item">
-                <label>EXECUTION LATENCY</label>
-                <div id="insp-node-duration" class="insp-val">-</div>
+              <div class="drawer-field">
+                <label>LATENCY</label>
+                <div id="drawer-node-duration" class="drawer-val">-</div>
               </div>
-              <div class="insp-item">
-                <label>TELEMETRY / PAYLOAD</label>
-                <pre id="insp-node-data" class="insp-code-block">// Select a node to inspect payload</pre>
+              <div class="drawer-field">
+                <label>DATA BUFFER / PAYLOAD</label>
+                <pre id="drawer-node-payload" class="drawer-code">// Click any node to inspect telemetry</pre>
               </div>
             </div>
           </aside>
@@ -224,14 +234,14 @@
       </section>
 
       <!-- Capabilities Tab -->
-      <section id="view-tools" class="panel-section">
-        <div class="workflow-header-bar">
-          <div class="wh-left">
-            <span class="wh-title">// INSTALLED CAPABILITIES HARNESS</span>
-            <span class="wh-sub">STANDARDIZED EXECUTION CONTRACT &amp; PERMISSION TIERS</span>
+      <section id="panel-tools" class="tab-panel">
+        <div class="workflow-top-bar">
+          <div class="wf-title-block">
+            <span class="wf-headline">ACTIVE CAPABILITIES</span>
+            <span class="wf-subline">STANDARDIZED HARNESS CONTRACTS</span>
           </div>
         </div>
-        <div id="tools-catalog" class="tools-catalog">
+        <div id="capabilities-grid" class="capabilities-grid">
           <!-- Populated dynamically -->
         </div>
       </section>
