@@ -254,6 +254,18 @@ class MascotWindow:
 
         threading.Thread(target=_send, daemon=True).start()
 
+    EMOTION_SEQUENCE = ["happy", "curious", "excited", "thinking", "confused", "concerned", "idle", "neutral"]
+    EMOTION_REACTIONS = {
+        "happy": "Glad you checked in.",
+        "curious": "Wonder what we'll explore next.",
+        "excited": "Oh! Something exciting?",
+        "thinking": "Pondering a thought...",
+        "confused": "Wait, did something happen?",
+        "concerned": "Hmm, everything alright?",
+        "idle": "Just resting my eyes a bit.",
+        "neutral": "I'm right here with you."
+    }
+
     def _on_single_click(self, event):
         self.drag_x = event.x
         self.drag_y = event.y
@@ -269,11 +281,33 @@ class MascotWindow:
 
     def _end_drag(self, event):
         if not self._dragging:
-            self.show_input_bubble()
+            # Clicked on Victor! Cycle emotion immediately with sound & personality response
+            try:
+                curr_idx = self.EMOTION_SEQUENCE.index(self.emotion)
+            except ValueError:
+                curr_idx = -1
+            next_emo = self.EMOTION_SEQUENCE[(curr_idx + 1) % len(self.EMOTION_SEQUENCE)]
+            reaction = self.EMOTION_REACTIONS.get(next_emo, f"Feeling {next_emo}.")
+            self.set_emotion(next_emo, reaction)
+
+            # Sync emotion to Workshop backend
+            def _sync():
+                try:
+                    data = json.dumps({"emotion": next_emo, "reason": "mascot_click"}).encode("utf-8")
+                    req = url_request.Request(
+                        "http://127.0.0.1:8000/api/emotion",
+                        data=data,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    url_request.urlopen(req, timeout=2)
+                except Exception:
+                    pass
+            threading.Thread(target=_sync, daemon=True).start()
         self._dragging = False
 
     def _on_double_click(self, event):
-        self._open_workshop()
+        # Double click opens quick chat entry or workshop
+        self.show_input_bubble()
 
     def _open_workshop(self):
         webbrowser.open("http://127.0.0.1:8000")

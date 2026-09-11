@@ -318,12 +318,16 @@ class VictorAgent:
             tool_obj = self.registry.get(tool_name)
             obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
+            # Check if user explicitly asked for detail
+            wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
+            length_rule = "Give a detailed answer as requested." if wants_detail else "Keep your answer small and concise: 1 to 2 sentences max. Do NOT give unsolicited essays."
+
             # Ask the model to synthesize a natural response
             observation_msg = (
                 f"Tool result ({tool_name}):\n"
                 f"{obs_formatted}\n\n"
                 f"The user asked: {user_message}\n"
-                f"Respond naturally and concisely. No emojis. No raw JSON."
+                f"{length_rule} No emojis. No raw JSON."
             )
 
             synthetic_history = list(self.history)
@@ -335,7 +339,7 @@ class VictorAgent:
                     messages=synthetic_history,
                     system_prompt=system_prompt,
                     temperature=self.config.model.temperature,
-                    max_tokens=self.config.model.max_tokens,
+                    max_tokens=self.config.model.max_tokens if wants_detail else 120,
                 )
                 if final_resp.content and not final_resp.content.startswith("[Ollama"):
                     final_content = strip_emojis(final_resp.content.strip())
@@ -348,13 +352,14 @@ class VictorAgent:
 
         # Case B: LLM reasoning with potential tool calling
         else:
+            wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
             await self.set_emotion("thinking", reason="Decomposing request via neural inference")
             await self.event_bus.emit("agent.thinking", state="planning")
             llm_resp = await self.llm.generate(
                 messages=self.history,
                 system_prompt=system_prompt,
                 temperature=self.config.model.temperature,
-                max_tokens=self.config.model.max_tokens,
+                max_tokens=self.config.model.max_tokens if wants_detail else 120,
             )
 
             initial_content = llm_resp.content
@@ -391,10 +396,11 @@ class VictorAgent:
                 tool_obj = self.registry.get(tool_name)
                 obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
+                length_rule = "Provide a detailed answer as requested." if wants_detail else "Keep your response small and concise: 1 to 2 sentences max."
                 observation_msg = (
                     f"Tool result ({tool_name}):\n"
                     f"{obs_formatted}\n\n"
-                    f"Respond naturally and concisely. No emojis. No raw JSON."
+                    f"{length_rule} No emojis. No raw JSON."
                 )
 
                 synthetic_history = list(self.history)
@@ -407,7 +413,7 @@ class VictorAgent:
                         messages=synthetic_history,
                         system_prompt=system_prompt,
                         temperature=self.config.model.temperature,
-                        max_tokens=self.config.model.max_tokens,
+                        max_tokens=self.config.model.max_tokens if wants_detail else 120,
                     )
                     if final_resp.content and not final_resp.content.startswith("[Ollama"):
                         final_content = strip_emojis(final_resp.content.strip())

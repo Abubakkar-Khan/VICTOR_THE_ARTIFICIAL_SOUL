@@ -40,3 +40,15 @@ def test_api_chat_slash_calc():
     assert data["type"] == "tool_result"
     assert data["tool_executed"] == "calculator"
     assert "144" in data["content"]
+
+
+def test_api_emotion_switch():
+    res = client.post("/api/emotion", json={"emotion": "excited", "reason": "user_click"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert data["emotion"] == "excited"
+
+    status_res = client.get("/api/status")
+    assert status_res.status_code == 200
+    assert status_res.json()["emotion"] == "excited"

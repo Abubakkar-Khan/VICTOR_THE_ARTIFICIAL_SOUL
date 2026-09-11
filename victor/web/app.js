@@ -156,7 +156,9 @@
   const statusDot = $('#status-dot');
   const statusText = $('#status-text');
   const victorAvatar = $('#victor-avatar');
-  const avatarFrame = $('#avatar-frame');
+  const avatarCard = $('#avatar-card');
+  const avatarFrame = $('.avatar-frame');
+  const headerMoodTag = $('#header-mood-tag');
   const emotionBadge = $('#emotion-badge');
   const emotionIcon = $('#emotion-icon');
   const emotionName = $('#emotion-name');
@@ -171,6 +173,10 @@
   const chatInput = $('#chat-input');
   const btnSend = $('#btn-send');
   const btnClear = $('#btn-clear');
+  const btnVoice = $('#btn-voice');
+  const voiceListeningBar = $('#voice-listening-bar');
+  const voiceTranscriptPreview = $('#voice-transcript-preview');
+
   const tasksContainer = $('#tasks-container');
   const factsList = $('#facts-list');
   const prefsList = $('#prefs-list');
@@ -187,6 +193,119 @@
   const btnPermAllow = $('#btn-perm-allow');
   const btnPermAlways = $('#btn-perm-always');
   const btnPermDeny = $('#btn-perm-deny');
+
+
+  // ── Emotion & Artificial Soul State ─────────────────────────────
+
+  const EMOTION_SEQUENCE = [
+    'neutral',
+    'happy',
+    'curious',
+    'thinking',
+    'excited',
+    'confused',
+    'concerned',
+    'idle'
+  ];
+
+  const EMOTION_REACTIONS = {
+    neutral: 'Standing by. Calm and level-headed.',
+    happy: 'Pleasant state. Systems running cleanly.',
+    curious: 'Observing closely. Noticed something intriguing.',
+    thinking: 'Synthesizing thoughts. Quiet processing.',
+    excited: 'Fascinating discovery! Energy elevated.',
+    confused: 'Puzzling state. Query needs clarity.',
+    concerned: 'Issue detected. Proceeding with caution.',
+    idle: 'Drifting in standby. Ready whenever you are.'
+  };
+
+  const MOOD_TAGS = {
+    neutral: 'Level-headed',
+    happy: 'Pleased',
+    curious: 'Inquisitive',
+    thinking: 'Reflecting',
+    excited: 'Intrigued',
+    confused: 'Puzzled',
+    concerned: 'Careful',
+    idle: 'At rest'
+  };
+
+  function setEmotion(name, playCue = true, updatePersonality = false) {
+    if (!EMOTIONS[name]) name = 'neutral';
+    currentEmotion = name;
+    const data = EMOTIONS[name];
+
+    // Update sprite with smooth transition
+    if (victorAvatar) {
+      victorAvatar.style.opacity = '0.3';
+      setTimeout(() => {
+        victorAvatar.src = data.sprite;
+        victorAvatar.style.opacity = '1';
+      }, 90);
+    }
+
+    // Update emotion badge
+    if (emotionIcon) emotionIcon.textContent = data.emoji;
+    if (emotionName) emotionName.textContent = data.label;
+    if (emotionBadge) {
+      emotionBadge.className = `emotion-badge ${name}`;
+    }
+
+    // Update header mood tag
+    if (headerMoodTag) {
+      headerMoodTag.textContent = MOOD_TAGS[name] || data.label;
+    }
+
+    // Update personality status line
+    if (updatePersonality && statusText && EMOTION_REACTIONS[name]) {
+      statusText.textContent = EMOTION_REACTIONS[name];
+    }
+
+    // Highlight active button in Emotion Studio (Settings)
+    $$('.emotion-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.emotion === name);
+    });
+
+    // Sound cue
+    if (playCue) {
+      synth.playEmotionCue(name);
+    }
+  }
+
+  // Interactive Avatar Click: cycle emotions and play chime
+  function handleAvatarClick() {
+    const nextIdx = (EMOTION_SEQUENCE.indexOf(currentEmotion) + 1) % EMOTION_SEQUENCE.length;
+    const nextEmo = EMOTION_SEQUENCE[nextIdx];
+    setEmotion(nextEmo, true, true);
+
+    // Inform backend so desktop mascot synchronizes
+    fetch('/api/emotion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emotion: nextEmo, reason: 'user_click' })
+    }).catch(() => {});
+  }
+
+  if (avatarCard) {
+    avatarCard.addEventListener('click', handleAvatarClick);
+  } else if (avatarFrame) {
+    avatarFrame.addEventListener('click', handleAvatarClick);
+  } else if (victorAvatar) {
+    victorAvatar.addEventListener('click', handleAvatarClick);
+  }
+
+  // Emotion Studio Buttons
+  $$('.emotion-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const emo = btn.dataset.emotion;
+      setEmotion(emo, true, true);
+      fetch('/api/emotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emotion: emo, reason: 'studio_preview' })
+      }).catch(() => {});
+    });
+  });
 
 
   // ── Navigation ─────────────────────────────────────────────────
@@ -218,70 +337,6 @@
   });
 
 
-  // ── Emotion & Artificial Soul State ─────────────────────────────
-
-  function setEmotion(name, playCue = true) {
-    if (!EMOTIONS[name]) name = 'neutral';
-    currentEmotion = name;
-    const data = EMOTIONS[name];
-
-    // Update sprite with smooth transition
-    if (victorAvatar) {
-      victorAvatar.style.opacity = '0.3';
-      setTimeout(() => {
-        victorAvatar.src = data.sprite;
-        victorAvatar.style.opacity = '1';
-      }, 100);
-    }
-
-    // Update emotion badge
-    if (emotionIcon) emotionIcon.textContent = data.emoji;
-    if (emotionName) emotionName.textContent = data.label;
-    if (emotionBadge) {
-      emotionBadge.className = `emotion-badge ${name}`;
-    }
-
-    // Highlight active button in Emotion Studio (Settings)
-    $$('.emotion-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.emotion === name);
-    });
-
-    // Sound cue
-    if (playCue) {
-      synth.playEmotionCue(name);
-    }
-  }
-
-  // Interactive Avatar Click
-  if (avatarFrame) {
-    const cycleList = ['neutral', 'happy', 'curious', 'thinking', 'excited', 'confused', 'concerned', 'idle'];
-    avatarFrame.addEventListener('click', () => {
-      const nextIdx = (cycleList.indexOf(currentEmotion) + 1) % cycleList.length;
-      const nextEmo = cycleList[nextIdx];
-      setEmotion(nextEmo, true);
-      // Inform backend
-      fetch('/api/emotion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emotion: nextEmo, reason: 'user_click' })
-      }).catch(() => {});
-    });
-  }
-
-  // Emotion Studio Buttons
-  $$('.emotion-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const emo = btn.dataset.emotion;
-      setEmotion(emo, true);
-      fetch('/api/emotion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emotion: emo, reason: 'studio_preview' })
-      }).catch(() => {});
-    });
-  });
-
-
   // ── Agent State & Cognitive Loop ───────────────────────────────
 
   function setAgentState(state, cognitivePhase = '') {
@@ -291,9 +346,13 @@
     } else if (state === 'error') {
       statusDot.classList.add('error');
     }
-    statusText.textContent = state === 'idle' ? 'idle' : state + '...';
+
     if (state === 'idle' || state === 'done') {
-      statusText.textContent = 'idle';
+      statusText.textContent = EMOTION_REACTIONS[currentEmotion] || 'Quietly present';
+    } else if (cognitivePhase) {
+      statusText.textContent = cognitivePhase;
+    } else {
+      statusText.textContent = state + '...';
     }
 
     if (cognitiveBadge) {
@@ -505,6 +564,108 @@
   });
 
 
+  // ── Voice Mode (Speech-to-Text) ───────────────────────────────
+
+  let recognition = null;
+  let isListening = false;
+
+  function initVoice() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      if (btnVoice) {
+        btnVoice.title = 'Speech Recognition requires Chrome, Edge, or an active microphone permission';
+        btnVoice.style.opacity = '0.55';
+      }
+      return;
+    }
+
+    try {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListening = true;
+        if (btnVoice) btnVoice.classList.add('recording');
+        if (voiceListeningBar) {
+          voiceListeningBar.style.display = 'flex';
+          if (voiceTranscriptPreview) {
+            voiceTranscriptPreview.textContent = 'Listening... speak naturally';
+          }
+        }
+        setEmotion('curious', false, false);
+        synth.playBlip(659.25);
+      };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let final = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        const text = (final || interim).trim();
+        if (text) {
+          if (voiceTranscriptPreview) {
+            voiceTranscriptPreview.textContent = `"${text}"`;
+          }
+          chatInput.value = text;
+          chatInput.style.height = 'auto';
+          chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Speech recognition error:', event.error);
+        if (voiceTranscriptPreview) {
+          voiceTranscriptPreview.textContent = `Voice status: ${event.error}`;
+        }
+        stopVoice();
+      };
+
+      recognition.onend = () => {
+        stopVoice();
+      };
+
+      if (btnVoice) {
+        btnVoice.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (isListening) {
+            try { recognition.stop(); } catch (err) {}
+            stopVoice();
+          } else {
+            try {
+              recognition.start();
+            } catch (err) {
+              console.warn('Recognition start failed:', err);
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Speech recognition initialization error:', err);
+    }
+  }
+
+  function stopVoice() {
+    isListening = false;
+    if (btnVoice) btnVoice.classList.remove('recording');
+    setTimeout(() => {
+      if (!isListening && voiceListeningBar) {
+        voiceListeningBar.style.display = 'none';
+      }
+    }, 1200);
+    if (chatInput.value.trim()) {
+      chatInput.focus();
+      synth.playBlip(880.00);
+    }
+  }
+
+
   // ── WebSocket ──────────────────────────────────────────────────
 
   let currentToolAnnotation = null;
@@ -547,7 +708,7 @@
     }
 
     if (data.emotion) {
-      setEmotion(data.emotion, false);
+      setEmotion(data.emotion, false, true);
     }
   }
 
@@ -561,7 +722,7 @@
 
       if (topic === 'agent.emotion') {
         if (data.emotion) {
-          setEmotion(data.emotion, true);
+          setEmotion(data.emotion, true, true);
         }
       }
 
@@ -610,7 +771,7 @@
         setAgentState('idle');
         removeThinking();
         if (data.emotion) {
-          setEmotion(data.emotion, false);
+          setEmotion(data.emotion, false, true);
         }
       }
 
@@ -940,10 +1101,11 @@
       const data = await res.json();
       modelName.textContent = data.model || 'qwen2:1.5b';
       if (data.emotion) {
-        setEmotion(data.emotion, false);
+        setEmotion(data.emotion, false, true);
       }
     } catch (e) {}
 
+    initVoice();
     initWebSocket();
   }
 

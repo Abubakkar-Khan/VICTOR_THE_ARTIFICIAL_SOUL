@@ -120,39 +120,39 @@ a:hover {
 /* ── Victor Pixel Avatar Card ────────────────────────────────────── */
 
 .sidebar-avatar-card {
-  padding: 0 16px 16px;
+  padding: 0 16px 14px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  cursor: pointer;
 }
 
 .avatar-frame {
   width: 140px;
-  height: 106px;
+  height: 104px;
   border-radius: 12px;
-  background: var(--bg-raised);
+  background: linear-gradient(180deg, #1d1c18 0%, #151411 100%);
   border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
-  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms ease, box-shadow 200ms ease;
 }
 
-.avatar-frame:hover {
-  transform: translateY(-2px);
+.sidebar-avatar-card:hover .avatar-frame {
+  transform: scale(1.02);
   border-color: var(--accent);
-  box-shadow: 0 6px 24px rgba(200, 149, 108, 0.25);
+  box-shadow: 0 6px 20px rgba(200, 149, 108, 0.2);
 }
 
 .avatar-sprite {
-  width: 132px;
+  width: 130px;
   height: auto;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
@@ -170,16 +170,28 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 8px;
   width: 100%;
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .brand-name {
-  display: block;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--text-primary);
+}
+
+.brand-personality-tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  margin-top: 2px;
 }
 
 .brand-status {
@@ -589,6 +601,62 @@ a:hover {
 .composer-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* Voice Mode STT Button */
+.voice-btn {
+  color: var(--text-tertiary);
+  border-color: var(--border-subtle);
+  transition: all var(--transition);
+}
+.voice-btn:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent);
+}
+.voice-btn.recording {
+  color: #F87171;
+  border-color: #F87171;
+  background: rgba(248, 113, 113, 0.1);
+  animation: voicePulse 1.2s infinite ease-in-out;
+}
+
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(248, 113, 113, 0); }
+}
+
+.voice-listening-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #F87171;
+  animation: fade-in 180ms ease;
+}
+
+.voice-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #F87171;
+  animation: gentle-pulse 1s infinite ease-in-out;
+}
+
+.header-mood-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(200, 149, 108, 0.08);
+  border: 1px solid rgba(200, 149, 108, 0.2);
+  letter-spacing: 0.04em;
 }
 
 

@@ -105,3 +105,15 @@ async def test_agent_autonomous_chat_routing():
     assert res["tool_executed"] is not None
     assert res["tool_executed"]["name"] == "calculator"
     assert "1,000" in res["content"] or "1000" in res["content"]
+
+
+@pytest.mark.asyncio
+async def test_agent_emotion_and_brevity():
+    agent = VictorAgent(llm=MockLLM("Understood. System is optimal."))
+    assert agent.emotion == "idle"
+    await agent.set_emotion("happy", reason="Greeting test")
+    assert agent.emotion == "happy"
+
+    res = await agent.chat("Are you working?")
+    assert "System is optimal" in res["content"]
+    assert res["emotion"] in ["happy", "neutral"]
