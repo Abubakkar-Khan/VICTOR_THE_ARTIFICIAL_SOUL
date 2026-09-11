@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      width: 240px;
+      height: 250px;
+      background: transparent;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-app-region: drag; /* Window drag */
+    }
+    .speech-bubble {
+      max-width: 210px;
+      background: #181815;
+      border: 1px solid #2A2924;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #E8E4DE;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      transition: opacity 200ms ease;
+      -webkit-app-region: no-drag;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 6px 6px 0;
+      border-style: solid;
+      border-color: #181815 transparent;
+      display: block;
+      width: 0;
+    }
+    .chat-input {
+      display: none;
+      width: 200px;
+      background: #1C1B17;
+      border: 1px solid #C8956C;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #E8E4DE;
+      font-size: 11px;
+      margin-bottom: 8px;
+      outline: none;
+      -webkit-app-region: no-drag;
+    }
+    .sprite-container {
+      width: 190px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      animation: floatAnim 3.8s ease-in-out infinite;
+    }
+    .sprite-img {
+      width: 180px;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      transition: opacity 150ms ease;
+    }
+    @keyframes floatAnim {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="speech-bubble" id="speech-bubble" style="display: none;"></div>
+  <input type="text" class="chat-input" id="chat-input" placeholder="Ask Victor..." />
+
+  <div class="sprite-container" id="sprite-box" title="Click to chat, double click for Workshop">
+    <img src="../victor/sprite/neutral_240.png" class="sprite-img" id="sprite-img" alt="Victor" />
+  </div>
+
+  <script>
+    const EMOTIONS = {
+      neutral:   '../victor/sprite/neutral_240.png',
+      happy:     '../victor/sprite/happy_240.png',
+      curious:   '../victor/sprite/curious_240.png',
+      idle:      '../victor/sprite/idle_240.png',
+      thinking:  '../victor/sprite/thinking_240.png',
+      excited:   '../victor/sprite/excited_240.png',
+      confused:  '../victor/sprite/confused_240.png',
+      concerned: '../victor/sprite/concerned_240.png'
+    };
+
+    const spriteImg = document.getElementById('sprite-img');
+    const speechBubble = document.getElementById('speech-bubble');
+    const chatInput = document.getElementById('chat-input');
+    const spriteBox = document.getElementById('sprite-box');
+
+    let currentEmotion = 'idle';
+
+    function setEmotion(name) {
+      if (EMOTIONS[name]) {
+        currentEmotion = name;
+        spriteImg.style.opacity = '0.3';
+        setTimeout(() => {
+          spriteImg.src = EMOTIONS[name];
+          spriteImg.style.opacity = '1';
+        }, 100);
+      }
+    }
+
+    function speak(text, duration = 4000) {
+      speechBubble.textContent = text;
+      speechBubble.style.display = 'block';
+      setTimeout(() => {
+        speechBubble.style.display = 'none';
+      }, duration);
+    }
+
+    spriteBox.addEventListener('click', () => {
+      chatInput.style.display = 'block';
+      chatInput.focus();
+    });
+
+    chatInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        const text = chatInput.value.trim();
+        chatInput.value = '';
+        chatInput.style.display = 'none';
+        if (text) {
+          setEmotion('thinking');
+          speak('Thinking...');
+          try {
+            const res = await fetch('http://127.0.0.1:8000/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: text })
+            });
+            const data = await res.json();
+            if (data.emotion) setEmotion(data.emotion);
+            speak(data.content || 'Got it.');
+          } catch (err) {
+            setEmotion('concerned');
+            speak('Could not connect to server.');
+          }
+        }
+      } else if (e.key === 'Escape') {
+        chatInput.style.display = 'none';
+      }
+    });
+
+    // Double click to open Workshop
+    spriteBox.addEventListener('dblclick', () => {
+      window.open('http://127.0.0.1:8000', '_blank');
+    });
+
+    // Polling backend for status updates
+    setInterval(async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/status');
+        const data = await res.json();
+        if (data.emotion && data.emotion !== currentEmotion && chatInput.style.display !== 'block') {
+          setEmotion(data.emotion);
+        }
+      } catch (e) {}
+    }, 2000);
+  </script>
+</body>
+</html>

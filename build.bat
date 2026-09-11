@@ -1,19 +1,19 @@
 @echo off
-title Build & Verify Victor
+title Build & Package Victor — The Artificial Soul
 echo ===================================================
-echo   Building and Verifying Victor — The Artificial Soul
+echo   Building & Packaging Victor — The Artificial Soul
 echo ===================================================
 
 echo.
-echo [1/2] Checking dependencies...
-pip install -r requirements.txt
+echo [1/3] Checking dependencies...
+pip install -r requirements.txt pyinstaller
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
     exit /b %errorlevel%
 )
 
 echo.
-echo [2/2] Running test suite...
+echo [2/3] Running test suite...
 python -m pytest -v tests/
 if %errorlevel% neq 0 (
     echo [ERROR] Test suite failed!
@@ -21,7 +21,15 @@ if %errorlevel% neq 0 (
 )
 
 echo.
+echo [3/3] Compiling standalone desktop executable with PyInstaller...
+pyinstaller --noconfirm --clean victor.spec
+if %errorlevel% neq 0 (
+    echo [ERROR] PyInstaller compilation failed!
+    exit /b %errorlevel%
+)
+
+echo.
 echo ===================================================
-echo   Build verification complete! All tests passed.
-echo   To start Victor, run: run.bat
+echo   BUILD COMPLETE!
+echo   Standalone application built: dist\Victor\Victor.exe
 echo ===================================================
