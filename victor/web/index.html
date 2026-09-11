@@ -211,11 +211,25 @@
             </div>
 
             <div class="settings-section">
-              <div class="settings-label">Local Neural Model</div>
+              <div class="settings-header-row">
+                <div class="settings-label">Local Neural Models (Ollama)</div>
+                <button class="settings-refresh-btn" id="btn-refresh-models" title="Rescan installed Ollama models">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  <span>Rescan</span>
+                </button>
+              </div>
+              <p class="settings-hint">Select from downloaded local models in Ollama (e.g. 0.5B, 1.5B, 2B, 3B).</p>
+              
               <div class="settings-row">
-                <span>Active Qwen / Ollama Model</span>
+                <span>Active Model</span>
                 <select class="settings-select" id="model-select"></select>
               </div>
+
+              <div class="models-grid" id="models-grid"></div>
             </div>
 
             <div class="settings-section">

@@ -1,5 +1,6 @@
 """Ollama Model Provider implementation for Victor."""
 
+import asyncio
 import json
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -28,15 +29,85 @@ class OllamaProvider(BaseLLM):
         self._verified_model: Optional[str] = None
 
     async def list_available_models(self) -> List[str]:
-        """Fetch list of available model tags from Ollama."""
+        """Fetch list of available model tag names from Ollama."""
+        detailed = await self.list_available_models_detailed()
+        return [m["name"] for m in detailed if m.get("name")]
+
+    async def list_available_models_detailed(self) -> List[Dict[str, Any]]:
+        """Fetch list of available models with rich metadata from Ollama (with CLI fallback)."""
+        # 1. Try HTTP API with 3.5s timeout
         try:
-            async with httpx.AsyncClient(trust_env=False, timeout=1.5) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=3.5) as client:
                 res = await client.get(f"{self.api_base}/api/tags")
                 if res.status_code == 200:
                     data = res.json()
-                    return [m.get("name", "") for m in data.get("models", [])]
+                    models_raw = data.get("models", [])
+                    results = []
+                    for m in models_raw:
+                        name = m.get("name") or m.get("model") or ""
+                        if not name:
+                            continue
+                        size_bytes = m.get("size", 0)
+                        details = m.get("details", {})
+                        param_size = details.get("parameter_size", "")
+                        family = details.get("family", "")
+
+                        if size_bytes >= 1024 * 1024 * 1024:
+                            size_str = f"{size_bytes / (1024**3):.1f} GB"
+                        elif size_bytes >= 1024 * 1024:
+                            size_str = f"{size_bytes / (1024**2):.0f} MB"
+                        else:
+                            size_str = f"{size_bytes} B"
+
+                        label = f"{name} ({param_size} · {size_str})" if param_size else f"{name} ({size_str})"
+                        is_small = any(k in name.lower() for k in ["0.5b", "1b", "1.5b", "2b", "3b", "620m", "360m", "135m"])
+
+                        results.append({
+                            "name": name,
+                            "label": label,
+                            "size": size_bytes,
+                            "size_str": size_str,
+                            "parameter_size": param_size,
+                            "family": family,
+                            "is_small": is_small,
+                            "modified_at": m.get("modified_at", ""),
+                        })
+                    if results:
+                        return results
         except Exception:
             pass
+
+        # 2. CLI fallback: 'ollama list'
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "ollama", "list",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3.0)
+            lines = stdout.decode("utf-8", errors="ignore").splitlines()
+            results = []
+            for line in lines[1:]:
+                parts = line.split()
+                if parts:
+                    name = parts[0]
+                    size_str = f"{parts[2]} {parts[3]}" if len(parts) >= 4 else ""
+                    is_small = any(k in name.lower() for k in ["0.5b", "1b", "1.5b", "2b", "3b", "620m"])
+                    results.append({
+                        "name": name,
+                        "label": f"{name} ({size_str})" if size_str else name,
+                        "size": 0,
+                        "size_str": size_str,
+                        "parameter_size": "",
+                        "family": "",
+                        "is_small": is_small,
+                        "modified_at": "",
+                    })
+            if results:
+                return results
+        except Exception:
+            pass
+
         return []
 
     async def resolve_active_model(self) -> str:

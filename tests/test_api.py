@@ -52,3 +52,19 @@ def test_api_emotion_switch():
     status_res = client.get("/api/status")
     assert status_res.status_code == 200
     assert status_res.json()["emotion"] == "excited"
+
+
+def test_api_models_listing_and_switch():
+    res = client.get("/api/models")
+    assert res.status_code == 200
+    data = res.json()
+    assert "current" in data
+    assert "available" in data
+    assert "available_models" in data
+    assert isinstance(data["available"], list)
+
+    switch_res = client.post("/api/models/switch", json={"model_name": "qwen:0.5b"})
+    assert switch_res.status_code == 200
+    switch_data = switch_res.json()
+    assert switch_data["status"] == "switched"
+    assert switch_data["model"] == "qwen:0.5b"

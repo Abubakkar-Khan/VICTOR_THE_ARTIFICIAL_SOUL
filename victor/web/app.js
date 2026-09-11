@@ -184,6 +184,8 @@
   const btnAddFact = $('#btn-add-fact');
   const toolsList = $('#tools-list');
   const modelSelect = $('#model-select');
+  const modelsGrid = $('#models-grid');
+  const btnRefreshModels = $('#btn-refresh-models');
   const soundToggle = $('#sound-toggle');
   const btnLaunchMascot = $('#btn-launch-mascot');
   const shellStatus = $('#shell-status');
@@ -1012,41 +1014,151 @@
       }
     } catch (e) {}
 
-    // Load available models
-    try {
-      const res = await fetch('/api/models');
-      const data = await res.json();
-      modelSelect.innerHTML = '';
-      const models = data.available_models || [];
-      const current = data.current_model || '';
-
-      models.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        if (m === current) opt.selected = true;
-        modelSelect.appendChild(opt);
-      });
-
-      if (!models.length) {
-        const opt = document.createElement('option');
-        opt.textContent = current || 'qwen2:1.5b';
-        modelSelect.appendChild(opt);
-      }
-    } catch (e) {}
+    await refreshModelsList();
   }
 
-  modelSelect.addEventListener('change', async () => {
+  async function refreshModelsList() {
+    try {
+      if (btnRefreshModels) {
+        btnRefreshModels.style.opacity = '0.6';
+        const svg = btnRefreshModels.querySelector('svg');
+        if (svg) svg.style.transform = 'rotate(180deg)';
+      }
+
+      const res = await fetch('/api/models');
+      const data = await res.json();
+
+      const detailed = data.models || [];
+      const modelNames = data.available_models || data.available || [];
+      const current = data.current_model || data.current || '';
+
+      // Update dropdown
+      if (modelSelect) {
+        modelSelect.innerHTML = '';
+        if (detailed.length) {
+          detailed.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.name;
+            opt.textContent = m.label || m.name;
+            if (m.name === current) opt.selected = true;
+            modelSelect.appendChild(opt);
+          });
+        } else if (modelNames.length) {
+          modelNames.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            if (name === current) opt.selected = true;
+            modelSelect.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.value = current || 'qwen2:1.5b';
+          opt.textContent = current || 'qwen2:1.5b (1.5B)';
+          modelSelect.appendChild(opt);
+        }
+      }
+
+      // Update models cards grid
+      if (modelsGrid) {
+        modelsGrid.innerHTML = '';
+        const items = detailed.length ? detailed : modelNames.map(n => ({
+          name: n,
+          label: n,
+          parameter_size: n.includes('0.5') ? '0.5B' : (n.includes('1.5') ? '1.5B' : (n.includes('3') ? '3B' : '')),
+          size_str: '',
+          is_small: n.includes('0.5') || n.includes('1.5') || n.includes('2') || n.includes('3')
+        }));
+
+        items.forEach(m => {
+          const card = document.createElement('div');
+          const isActive = m.name === current;
+          card.className = `model-card${isActive ? ' active' : ''}`;
+          card.dataset.model = m.name;
+
+          const header = document.createElement('div');
+          header.className = 'model-card-header';
+
+          const title = document.createElement('span');
+          title.className = 'model-card-name';
+          title.textContent = m.name;
+
+          const badge = document.createElement('span');
+          badge.className = 'model-card-badge';
+          badge.textContent = isActive ? 'Active' : 'Downloaded';
+
+          header.appendChild(title);
+          header.appendChild(badge);
+
+          const meta = document.createElement('div');
+          meta.className = 'model-card-meta';
+
+          if (m.parameter_size) {
+            const paramPill = document.createElement('span');
+            paramPill.className = `model-card-pill${m.is_small ? ' small' : ''}`;
+            paramPill.textContent = m.parameter_size;
+            meta.appendChild(paramPill);
+          }
+
+          if (m.size_str) {
+            const sizePill = document.createElement('span');
+            sizePill.className = 'model-card-pill';
+            sizePill.textContent = m.size_str;
+            meta.appendChild(sizePill);
+          }
+
+          card.appendChild(header);
+          card.appendChild(meta);
+
+          card.addEventListener('click', async () => {
+            if (m.name === current) return;
+            await doSwitchModel(m.name);
+          });
+
+          modelsGrid.appendChild(card);
+        });
+      }
+
+      if (btnRefreshModels) {
+        setTimeout(() => {
+          btnRefreshModels.style.opacity = '1';
+          const svg = btnRefreshModels.querySelector('svg');
+          if (svg) svg.style.transform = '';
+        }, 300);
+      }
+    } catch (e) {
+      console.warn('Could not refresh models list:', e);
+    }
+  }
+
+  async function doSwitchModel(modelNameVal) {
     try {
       await fetch('/api/models/switch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_name: modelSelect.value })
+        body: JSON.stringify({ model_name: modelNameVal })
       });
-      modelName.textContent = modelSelect.value;
-      setEmotion('curious');
-    } catch (e) {}
-  });
+      if (modelName) modelName.textContent = modelNameVal;
+      setEmotion('curious', true, true);
+      synth.playEmotionCue('happy');
+      await refreshModelsList();
+    } catch (e) {
+      console.warn('Switch model failed:', e);
+    }
+  }
+
+  if (modelSelect) {
+    modelSelect.addEventListener('change', async () => {
+      await doSwitchModel(modelSelect.value);
+    });
+  }
+
+  if (btnRefreshModels) {
+    btnRefreshModels.addEventListener('click', async () => {
+      synth.playBlip(587.33);
+      await refreshModelsList();
+    });
+  }
 
   // Launch Desktop Mascot
   btnLaunchMascot.addEventListener('click', async () => {

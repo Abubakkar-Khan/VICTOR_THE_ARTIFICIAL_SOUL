@@ -193,16 +193,36 @@ async def respond_permission(req: PermissionResponseRequest):
 
 @app.get("/api/models")
 async def get_models():
-    available = []
-    if hasattr(agent.llm, "list_available_models"):
+    detailed = []
+    names = []
+    if hasattr(agent.llm, "list_available_models_detailed"):
         try:
-            available = await agent.llm.list_available_models()
+            detailed = await agent.llm.list_available_models_detailed()
+            names = [m["name"] for m in detailed if "name" in m]
         except Exception:
-            available = []
+            detailed = []
+            names = []
+    elif hasattr(agent.llm, "list_available_models"):
+        try:
+            names = await agent.llm.list_available_models()
+        except Exception:
+            names = []
+
+    try:
+        if hasattr(agent.llm, "resolve_active_model"):
+            active_model = await asyncio.wait_for(agent.llm.resolve_active_model(), timeout=1.5)
+        else:
+            active_model = agent.config.model.name
+    except Exception:
+        active_model = agent.config.model.name
+
     return {
-        "current": agent.config.model.name,
+        "current": active_model,
+        "current_model": active_model,
         "provider": agent.config.model.provider,
-        "available": available,
+        "available": names,
+        "available_models": names,
+        "models": detailed,
     }
 
 
@@ -210,7 +230,8 @@ async def get_models():
 async def switch_model(req: ModelSwitchRequest):
     agent.config.model.name = req.model_name
     agent.llm = create_model_provider(agent.config.model)
-    return {"status": "switched", "model": req.model_name}
+    await agent.event_bus.emit("agent.model_switched", model=req.model_name)
+    return {"status": "switched", "model": req.model_name, "current": req.model_name}
 
 
 # --- Desktop Mascot Launch Endpoint ---

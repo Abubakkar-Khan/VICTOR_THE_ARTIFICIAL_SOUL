@@ -990,11 +990,18 @@ a:hover {
   padding: 32px;
   overflow-y: auto;
   flex: 1;
-  max-width: 480px;
+  max-width: 580px;
 }
 
 .settings-section {
   margin-bottom: 32px;
+}
+
+.settings-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
 .settings-label {
@@ -1003,7 +1010,112 @@ a:hover {
   color: var(--text-tertiary);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-bottom: 14px;
+}
+
+.settings-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.settings-refresh-btn:hover {
+  color: var(--accent-bright);
+  border-color: var(--accent);
+  background: var(--bg-raised);
+}
+.settings-refresh-btn svg {
+  transition: transform 0.3s ease;
+}
+.settings-refresh-btn:active svg {
+  transform: rotate(180deg);
+}
+
+.models-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.model-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.model-card:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-raised);
+  transform: translateY(-1px);
+}
+.model-card.active {
+  border-color: var(--accent);
+  background: rgba(200, 149, 108, 0.07);
+  box-shadow: 0 0 12px rgba(200, 149, 108, 0.12);
+}
+
+.model-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.model-card-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.model-card-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-subtle);
+  letter-spacing: 0.02em;
+}
+.model-card.active .model-card-badge {
+  background: rgba(200, 149, 108, 0.18);
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+
+.model-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.model-card-pill {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.model-card-pill.small {
+  color: #8BA888;
+  background: rgba(139, 168, 136, 0.12);
+  border-color: rgba(139, 168, 136, 0.25);
 }
 
 .settings-row {
@@ -1031,6 +1143,7 @@ a:hover {
   font-size: 12px;
   outline: none;
   cursor: pointer;
+  max-width: 260px;
 }
 .settings-select:focus {
   border-color: var(--border-focus);
