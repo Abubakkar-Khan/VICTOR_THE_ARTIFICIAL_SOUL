@@ -141,7 +141,10 @@ class MascotWindow:
         if not HAS_PIL:
             return
 
-        base_dir = Path(__file__).resolve().parent.parent
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            base_dir = Path(sys._MEIPASS) / "victor"
+        else:
+            base_dir = Path(__file__).resolve().parent.parent
         sprite_dir = base_dir / "sprite"
         target_w = 200
         target_h = 145

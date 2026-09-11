@@ -32,7 +32,11 @@ app.add_middleware(
 config = load_config()
 agent = VictorAgent(config=config)
 
-web_dir = Path(__file__).parent.parent / "web"
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    web_dir = Path(sys._MEIPASS) / "victor" / "web"
+else:
+    web_dir = Path(__file__).parent.parent / "web"
+
 if web_dir.exists():
     app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 

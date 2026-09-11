@@ -1,6 +1,6 @@
 """Configuration manager for Victor."""
 
-import os
+import sys
 from pathlib import Path
 from typing import List, Optional
 import yaml
@@ -53,11 +53,15 @@ def find_config_path(override_path: Optional[str] = None) -> Path:
     if override_path and Path(override_path).exists():
         return Path(override_path)
     
-    candidates = [
+    candidates = []
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        candidates.append(Path(sys._MEIPASS) / "config" / "victor.yaml")
+    
+    candidates.extend([
         Path("config/victor.yaml"),
         Path("../config/victor.yaml"),
         Path(__file__).resolve().parent.parent.parent / "config" / "victor.yaml",
-    ]
+    ])
     for candidate in candidates:
         if candidate.exists():
             return candidate.resolve()

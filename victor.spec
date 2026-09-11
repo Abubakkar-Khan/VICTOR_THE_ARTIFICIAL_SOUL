@@ -26,8 +26,13 @@ hiddenimports = [
     'uvicorn.lifespans',
     'uvicorn.lifespans.on',
     'fastapi',
+    'fastapi.staticfiles',
     'starlette',
     'starlette.routing',
+    'starlette.staticfiles',
+    'starlette.middleware',
+    'starlette.middleware.cors',
+    'starlette.responses',
     'pydantic',
     'pydantic_core',
     'PIL',
@@ -35,6 +40,9 @@ hiddenimports = [
     'PIL.ImageTk',
     'duckduckgo_search',
     'bs4',
+    'yaml',
+    'urllib.request',
+    'tkinter',
 ]
 
 a = Analysis(
