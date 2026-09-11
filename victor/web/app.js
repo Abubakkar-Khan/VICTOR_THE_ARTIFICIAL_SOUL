@@ -1,805 +1,772 @@
-/**
- * VICTOR — THE ARTIFICIAL SOUL // Modern Control Center Orchestration Engine
- * Complete client implementation with 7 views, integrated animated mascot,
- * Web Speech API (STT & TTS), real-time hierarchical flow, tasks, and memory.
- */
+/* ================================================================
+   Victor — The Artificial Soul
+   Workshop Client
+   
+   Handles WebSocket events, REST API calls, and view rendering.
+   Typography-first. Quiet. No emojis.
+   ================================================================ */
 
-document.addEventListener("DOMContentLoaded", () => {
-  // ---------------------------------------------------------------------------
-  // 1. Navigation & State
-  // ---------------------------------------------------------------------------
-  const navItems = document.querySelectorAll(".nav-item");
-  const viewPanels = document.querySelectorAll(".view-panel");
-  const viewTitle = document.getElementById("view-title");
-  const activeModelPill = document.getElementById("active-model-pill");
+(function () {
+  'use strict';
 
-  // Chat Elements
-  const chatFeed = document.getElementById("chat-feed");
-  const userChatInput = document.getElementById("user-chat-input");
-  const btnChatSend = document.getElementById("btn-chat-send");
-  const btnClearChat = document.getElementById("btn-clear-chat");
-  const btnExportChat = document.getElementById("btn-export-chat");
-  const btnVoiceMic = document.getElementById("btn-voice-mic");
-  const btnTtsToggle = document.getElementById("btn-tts-toggle");
-  const ttsLabel = document.getElementById("tts-label");
+  // ── State ──────────────────────────────────────────────────────
 
-  // Mascot Elements
-  const mascotSvg = document.getElementById("mascot-svg");
-  const mascotStatePill = document.getElementById("mascot-state-pill");
-  const mascotSpeechText = document.getElementById("mascot-speech-text");
-  const btnLaunchDesktopMascot = document.getElementById("btn-launch-desktop-mascot");
-  const btnSettingsLaunchMascot = document.getElementById("btn-settings-launch-mascot");
-
-  // Workflow Elements
-  const workflowTreeNodes = document.getElementById("workflow-tree-nodes");
-  const wfBeaconDot = document.getElementById("wf-beacon-dot");
-  const flowDrawer = document.getElementById("flow-drawer");
-  const btnCloseDrawer = document.getElementById("btn-close-drawer");
-  const drawerTitle = document.getElementById("drawer-title");
-  const drawerStatus = document.getElementById("drawer-status");
-  const drawerPayload = document.getElementById("drawer-payload");
-  const btnResetWorkflow = document.getElementById("btn-reset-workflow");
-
-  // Tasks & Memory Elements
-  const tasksGrid = document.getElementById("tasks-grid");
-  const badgeTasksCount = document.getElementById("badge-tasks-count");
-  const factsList = document.getElementById("facts-list");
-  const preferencesList = document.getElementById("preferences-list");
-  const newFactInput = document.getElementById("new-fact-input");
-  const btnAddFact = document.getElementById("btn-add-fact");
-
-  // Tools & Models Elements
-  const toolsGrid = document.getElementById("tools-grid");
-  const modelsList = document.getElementById("models-list");
-  const modelActiveVal = document.getElementById("model-active-val");
-  const modelProviderVal = document.getElementById("model-provider-val");
-
-  // Settings & Permission Modal Elements
-  const ttsVoiceSelect = document.getElementById("tts-voice-select");
-  const ttsRateRange = document.getElementById("tts-rate-range");
-  const permissionModal = document.getElementById("permission-modal");
-  const permTitle = document.getElementById("perm-title");
-  const permDesc = document.getElementById("perm-desc");
-  const permDetails = document.getElementById("perm-details");
-  const btnPermAllowOnce = document.getElementById("btn-perm-allow-once");
-  const btnPermAlwaysAllow = document.getElementById("btn-perm-always-allow");
-  const btnPermDeny = document.getElementById("btn-perm-deny");
-
-  let socket = null;
-  let isTransmitting = false;
-  let ttsEnabled = localStorage.getItem("victor_tts_enabled") !== "false";
-  let activePermRequestId = null;
-
-  const viewHeadlines = {
-    chat: "Conversation",
-    workflow: "Live Execution Flow",
-    tasks: "Autonomous Tasks",
-    memory: "Persistent Memory",
-    tools: "Capabilities & Tools",
-    models: "Model Architecture",
-    settings: "Settings & Controls",
-  };
-
-  function switchView(viewName) {
-    navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === viewName));
-    viewPanels.forEach((p) => p.classList.toggle("active", p.id === `view-${viewName}`));
-    if (viewTitle) viewTitle.textContent = viewHeadlines[viewName] || "Workspace";
-
-    // Refresh specific view data on switch
-    if (viewName === "tasks") loadTasks();
-    if (viewName === "memory") loadMemory();
-    if (viewName === "tools") loadTools();
-    if (viewName === "models") loadModels();
-  }
-
-  navItems.forEach((btn) => {
-    btn.addEventListener("click", () => switchView(btn.dataset.view));
-  });
-
-  // ---------------------------------------------------------------------------
-  // 2. Animated Mascot State Machine
-  // ---------------------------------------------------------------------------
-  let currentMascotState = "idle";
-
-  function setMascotState(state, speech = "") {
-    currentMascotState = state;
-    if (mascotSvg) {
-      mascotSvg.className = `mascot-svg ${state}`;
-    }
-    if (mascotStatePill) {
-      mascotStatePill.className = `state-pill ${state}`;
-      mascotStatePill.textContent = state.toUpperCase();
-    }
-    if (speech && mascotSpeechText) {
-      mascotSpeechText.textContent = speech.slice(0, 95);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. Voice Support: Speech Recognition (STT) & Speech Synthesis (TTS)
-  // ---------------------------------------------------------------------------
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let ws = null;
+  let wsRetryDelay = 1000;
+  let currentView = 'chat';
+  let ttsEnabled = false;
+  let speechSynth = window.speechSynthesis || null;
+  let selectedVoice = null;
   let recognition = null;
   let isListening = false;
 
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
 
-    recognition.onstart = () => {
-      isListening = true;
-      if (btnVoiceMic) btnVoiceMic.classList.add("listening");
-      setMascotState("listening", "Listening to your voice...");
-    };
+  // ── DOM References ─────────────────────────────────────────────
 
-    recognition.onresult = (event) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        transcript += event.results[i][0].transcript;
-      }
-      if (userChatInput) {
-        userChatInput.value = transcript;
-      }
-    };
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
 
-    recognition.onend = () => {
-      isListening = false;
-      if (btnVoiceMic) btnVoiceMic.classList.remove("listening");
-      if (userChatInput && userChatInput.value.trim()) {
-        sendUserMessage();
-      } else {
-        setMascotState("idle", "Standing by.");
-      }
-    };
+  const statusDot = $('#status-dot');
+  const statusText = $('#status-text');
+  const modelName = $('#model-name');
+  const viewTitle = $('#view-title');
+  const chatFeed = $('#chat-feed');
+  const chatEmpty = $('#chat-empty');
+  const chatInput = $('#chat-input');
+  const btnSend = $('#btn-send');
+  const btnMic = $('#btn-mic');
+  const btnClear = $('#btn-clear');
+  const tasksContainer = $('#tasks-container');
+  const tasksEmpty = $('#tasks-empty');
+  const factsList = $('#facts-list');
+  const prefsList = $('#prefs-list');
+  const factInput = $('#fact-input');
+  const btnAddFact = $('#btn-add-fact');
+  const toolsList = $('#tools-list');
+  const modelSelect = $('#model-select');
+  const ttsToggle = $('#tts-toggle');
+  const voiceSelect = $('#voice-select');
+  const btnLaunchMascot = $('#btn-launch-mascot');
+  const shellStatus = $('#shell-status');
+  const permModal = $('#permission-modal');
+  const permDesc = $('#perm-desc');
+  const permDetails = $('#perm-details');
+  const btnPermAllow = $('#btn-perm-allow');
+  const btnPermAlways = $('#btn-perm-always');
+  const btnPermDeny = $('#btn-perm-deny');
 
-    recognition.onerror = () => {
-      isListening = false;
-      if (btnVoiceMic) btnVoiceMic.classList.remove("listening");
-      setMascotState("idle");
-    };
+
+  // ── Navigation ─────────────────────────────────────────────────
+
+  const viewNames = {
+    chat: 'Chat',
+    tasks: 'Tasks',
+    memory: 'Memory',
+    tools: 'Tools',
+    settings: 'Settings'
+  };
+
+  function switchView(view) {
+    currentView = view;
+    $$('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+    $$('.view-panel').forEach(panel => panel.classList.toggle('active', panel.id === `view-${view}`));
+    viewTitle.textContent = viewNames[view] || view;
+
+    // Lazy-load data for views
+    if (view === 'tasks') loadTasks();
+    if (view === 'memory') loadMemory();
+    if (view === 'tools') loadTools();
+    if (view === 'settings') loadSettings();
+
+    // Show/hide header clear button (only on chat)
+    btnClear.style.display = view === 'chat' ? '' : 'none';
   }
 
-  if (btnVoiceMic) {
-    btnVoiceMic.addEventListener("click", () => {
-      if (!recognition) {
-        alert("Web Speech API recognition is not supported in this browser.");
-        return;
-      }
-      if (isListening) {
-        recognition.stop();
-      } else {
-        recognition.start();
-      }
-    });
-  }
-
-  // TTS Setup
-  function updateTtsButtonUI() {
-    if (ttsLabel) ttsLabel.textContent = ttsEnabled ? "Voice: On" : "Voice: Off";
-    if (btnTtsToggle) btnTtsToggle.classList.toggle("active", ttsEnabled);
-  }
-  updateTtsButtonUI();
-
-  if (btnTtsToggle) {
-    btnTtsToggle.addEventListener("click", () => {
-      ttsEnabled = !ttsEnabled;
-      localStorage.setItem("victor_tts_enabled", ttsEnabled ? "true" : "false");
-      updateTtsButtonUI();
-    });
-  }
-
-  let voices = [];
-  function populateVoices() {
-    if (!window.speechSynthesis || !ttsVoiceSelect) return;
-    voices = window.speechSynthesis.getVoices();
-    ttsVoiceSelect.innerHTML = "";
-    voices.forEach((v, i) => {
-      const opt = document.createElement("option");
-      opt.value = i;
-      opt.textContent = `${v.name} (${v.lang})`;
-      if (v.default || v.name.includes("Google") || v.name.includes("Natural")) {
-        opt.selected = true;
-      }
-      ttsVoiceSelect.appendChild(opt);
-    });
-  }
-
-  if (window.speechSynthesis) {
-    populateVoices();
-    window.speechSynthesis.onvoiceschanged = populateVoices;
-  }
-
-  function speakText(text) {
-    if (!ttsEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-
-    const cleanText = text.replace(/`{1,3}[\s\S]*?`{1,3}/g, "").replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    if (ttsVoiceSelect && voices[ttsVoiceSelect.value]) {
-      utterance.voice = voices[ttsVoiceSelect.value];
-    }
-    if (ttsRateRange) {
-      utterance.rate = parseFloat(ttsRateRange.value) || 1.0;
-    }
-    window.speechSynthesis.speak(utterance);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. Borderless Chat Presentation
-  // ---------------------------------------------------------------------------
-  function stripEmojis(str) {
-    if (!str) return "";
-    return str.replace(
-      /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g,
-      ""
-    );
-  }
-
-  function escapeHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function formatMarkdown(str) {
-    if (!str) return "";
-    let clean = escapeHtml(str);
-    clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (m, lang, code) => `<pre><code>${code.trim()}</code></pre>`);
-    clean = clean.replace(/`([^`]+)`/g, "<code>$1</code>");
-    clean = clean.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    return clean;
-  }
-
-  function appendUserMessage(text) {
-    const row = document.createElement("div");
-    row.className = "chat-row user-row";
-    const time = new Date().toTimeString().split(" ")[0].slice(0, 5);
-
-    row.innerHTML = `
-      <div class="avatar-capsule">U</div>
-      <div class="speech-content">
-        <div class="speech-header">
-          <span class="speech-author">User</span>
-          <span class="speech-time">${time}</span>
-        </div>
-        <div class="speech-body">${escapeHtml(stripEmojis(text))}</div>
-      </div>
-    `;
-
-    chatFeed.appendChild(row);
-    chatFeed.scrollTop = chatFeed.scrollHeight;
-  }
-
-  function appendVictorMessage(text) {
-    const row = document.createElement("div");
-    row.className = "chat-row victor-row";
-    const time = new Date().toTimeString().split(" ")[0].slice(0, 5);
-    const clean = stripEmojis(text);
-
-    row.innerHTML = `
-      <div class="avatar-capsule">V</div>
-      <div class="speech-content">
-        <div class="speech-header">
-          <span class="speech-author">Victor</span>
-          <span class="speech-time">${time}</span>
-        </div>
-        <div class="speech-body">${formatMarkdown(clean)}</div>
-        <button class="btn-copy-reply">Copy</button>
-      </div>
-    `;
-
-    const copyBtn = row.querySelector(".btn-copy-reply");
-    if (copyBtn) {
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(clean).then(() => {
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
-        });
-      });
-    }
-
-    chatFeed.appendChild(row);
-    chatFeed.scrollTop = chatFeed.scrollHeight;
-
-    // Speak response
-    speakText(clean);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 5. WebSocket & Real-Time Telemetry
-  // ---------------------------------------------------------------------------
-  function setTransmitting(active) {
-    isTransmitting = active;
-    if (btnChatSend) {
-      btnChatSend.disabled = active;
-      btnChatSend.querySelector("span").textContent = active ? "Thinking..." : "Send";
-    }
-  }
-
-  function initWebSocket() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
-
-    socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-      console.log("[Victor] WebSocket connected");
-      setMascotState("idle", "Connected and standing by.");
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        handleServerMessage(payload);
-      } catch (err) {
-        console.error("Payload error:", err);
-      }
-    };
-
-    socket.onclose = () => {
-      setTimeout(initWebSocket, 2500);
-    };
-  }
-
-  function handleServerMessage(payload) {
-    if (payload.type === "event") {
-      const evt = payload.event;
-      const topic = evt.topic;
-      const data = evt.data || {};
-
-      if (topic === "agent.started") {
-        setMascotState("listening", "Processing your directive...");
-        if (wfBeaconDot) wfBeaconDot.classList.add("pulsing");
-
-      } else if (topic === "mascot.state_changed") {
-        setMascotState(data.state || "idle", data.message || "");
-
-      } else if (topic === "agent.hierarchical_plan") {
-        renderWorkflowTree(data.plan?.nodes || []);
-
-      } else if (topic === "tool.started") {
-        setMascotState("working", `Executing ${data.tool}...`);
-        updateNodeState(data.tool, "running");
-
-      } else if (topic === "tool.completed") {
-        setMascotState("working", `Completed ${data.tool}.`);
-        updateNodeState(data.tool, "completed", data.output);
-
-      } else if (topic === "agent.thinking") {
-        setMascotState("thinking", "Synthesizing answer...");
-
-      } else if (topic === "agent.completed") {
-        setMascotState("completed", "Task finished.");
-        if (wfBeaconDot) wfBeaconDot.classList.remove("pulsing");
-
-      } else if (topic === "permission.requested") {
-        promptPermissionModal(data);
-      }
-
-    } else if (payload.type === "chat_result") {
-      appendVictorMessage(payload.data.content);
-      setTransmitting(false);
-      setMascotState("completed", "Done!");
-      setTimeout(() => setMascotState("idle", "Ready for next directive."), 3000);
-      loadTasks();
-    }
-  }
-
-  async function sendUserMessage() {
-    const text = userChatInput.value.trim();
-    if (!text || isTransmitting) return;
-
-    appendUserMessage(text);
-    userChatInput.value = "";
-    setTransmitting(true);
-    setMascotState("thinking", "Analyzing request...");
-
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ message: text }));
-    } else {
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        });
-        const data = await res.json();
-        appendVictorMessage(data.content);
-      } catch (err) {
-        appendVictorMessage(`Communication error: ${err}`);
-      } finally {
-        setTransmitting(false);
-        setMascotState("idle");
-      }
-    }
-  }
-
-  if (btnChatSend) btnChatSend.addEventListener("click", sendUserMessage);
-  if (userChatInput) {
-    userChatInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        sendUserMessage();
-      }
-    });
-  }
-
-  // Suggestion Chips
-  document.querySelectorAll(".chip-btn").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const q = chip.dataset.query;
-      if (q && userChatInput) {
-        userChatInput.value = q;
-        sendUserMessage();
-      }
-    });
+  $$('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
 
-  // Clear & Export Chat
-  if (btnClearChat) {
-    btnClearChat.addEventListener("click", () => {
-      chatFeed.innerHTML = "";
-      appendVictorMessage("Conversation cleared. How can I help you?");
-      fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "/clear", reset: true }),
-      });
+
+  // ── Agent State ────────────────────────────────────────────────
+
+  function setAgentState(state) {
+    statusDot.className = 'status-dot';
+    if (state === 'thinking' || state === 'working') {
+      statusDot.classList.add(state);
+    } else if (state === 'error') {
+      statusDot.classList.add('error');
+    }
+    statusText.textContent = state === 'idle' ? 'idle' : state + '...';
+    if (state === 'idle' || state === 'done') {
+      statusText.textContent = 'idle';
+    }
+  }
+
+
+  // ── Text Utilities ─────────────────────────────────────────────
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function stripEmojis(str) {
+    return str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
+  }
+
+  function formatMarkdown(text) {
+    // Simple markdown: bold, italic, code blocks, inline code, links, line breaks
+    let html = escapeHtml(text);
+
+    // Code blocks
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+      return `<pre><code>${code.trim()}</code></pre>`;
+    });
+
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Italic
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    // Bare URLs
+    html = html.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/gm, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+
+    // Line breaks to paragraphs
+    const paras = html.split(/\n\n+/).filter(p => p.trim());
+    if (paras.length > 1) {
+      html = paras.map(p => {
+        if (p.startsWith('<pre>')) return p;
+        return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+      }).join('');
+    } else {
+      html = html.replace(/\n/g, '<br>');
+    }
+
+    return html;
+  }
+
+
+  // ── Chat Rendering ─────────────────────────────────────────────
+
+  function hideEmptyState() {
+    if (chatEmpty) chatEmpty.style.display = 'none';
+  }
+
+  function appendMessage(sender, text) {
+    hideEmptyState();
+    const msg = document.createElement('div');
+    msg.className = 'message';
+
+    const label = document.createElement('div');
+    label.className = 'message-sender';
+    label.textContent = sender;
+
+    const body = document.createElement('div');
+    body.className = 'message-body';
+    body.innerHTML = formatMarkdown(stripEmojis(text));
+
+    msg.appendChild(label);
+    msg.appendChild(body);
+    chatFeed.appendChild(msg);
+    scrollToBottom();
+    return msg;
+  }
+
+  function appendToolAnnotation(toolName, status, duration) {
+    hideEmptyState();
+    const ann = document.createElement('div');
+    ann.className = `tool-annotation ${status}`;
+    let text = toolName.replace(/_/g, ' ');
+    if (duration) text += ` \u00B7 ${duration}`;
+    ann.textContent = text;
+    ann.id = `tool-ann-${toolName}-${Date.now()}`;
+    chatFeed.appendChild(ann);
+    scrollToBottom();
+    return ann;
+  }
+
+  function appendThinking() {
+    hideEmptyState();
+    // Remove previous thinking indicator
+    const prev = chatFeed.querySelector('.thinking-indicator');
+    if (prev) prev.remove();
+
+    const el = document.createElement('div');
+    el.className = 'thinking-indicator';
+    el.textContent = 'thinking...';
+    chatFeed.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function removeThinking() {
+    const el = chatFeed.querySelector('.thinking-indicator');
+    if (el) el.remove();
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => {
+      chatFeed.scrollTop = chatFeed.scrollHeight;
     });
   }
 
-  if (btnExportChat) {
-    btnExportChat.addEventListener("click", () => {
-      const rows = chatFeed.querySelectorAll(".chat-row");
-      let md = `# Victor — Conversation Export\nDate: ${new Date().toISOString()}\n\n`;
-      rows.forEach((r) => {
-        const isUser = r.classList.contains("user-row");
-        const author = isUser ? "User" : "Victor";
-        const body = r.querySelector(".speech-body")?.innerText || "";
-        md += `### ${author}\n${body}\n\n`;
-      });
-      const blob = new Blob([md], { type: "text/markdown" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `victor-chat-${Date.now()}.md`;
-      a.click();
-    });
+  // Auto-resize textarea
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+  });
+
+
+  // ── Send Message ───────────────────────────────────────────────
+
+  function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    appendMessage('You', text);
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'chat', message: text }));
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // 6. Workflow Tree Renderer
-  // ---------------------------------------------------------------------------
-  let currentTreeNodes = [];
+  btnSend.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 
-  function renderWorkflowTree(nodes) {
-    if (!workflowTreeNodes) return;
-    currentTreeNodes = nodes;
-    workflowTreeNodes.innerHTML = "";
+  btnClear.addEventListener('click', () => {
+    chatFeed.innerHTML = '';
+    if (chatEmpty) {
+      chatFeed.appendChild(chatEmpty);
+      chatEmpty.style.display = '';
+    }
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '/clear' })
+    }).catch(() => {});
+  });
 
-    nodes.forEach((node) => {
-      const card = document.createElement("div");
-      card.className = `tree-card ${node.status}`;
-      card.dataset.nodeId = node.id;
 
-      card.innerHTML = `
-        <div class="card-node-info">
-          <span class="node-label">${escapeHtml(node.label)}</span>
-          <span class="node-detail">${escapeHtml(node.detail || "")}</span>
-        </div>
-        <span class="node-status-pill ${node.status}">${node.status}</span>
-      `;
+  // ── WebSocket ──────────────────────────────────────────────────
 
-      card.addEventListener("click", () => {
-        if (drawerTitle) drawerTitle.textContent = node.label;
-        if (drawerStatus) drawerStatus.textContent = node.status.toUpperCase();
-        if (drawerPayload) drawerPayload.textContent = JSON.stringify(node, null, 2);
-        if (flowDrawer) flowDrawer.classList.add("open");
-      });
+  let currentToolAnnotation = null;
 
-      workflowTreeNodes.appendChild(card);
-    });
+  function initWebSocket() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws/chat`);
+
+    ws.onopen = () => {
+      wsRetryDelay = 1000;
+      setAgentState('idle');
+    };
+
+    ws.onclose = () => {
+      setAgentState('idle');
+      setTimeout(initWebSocket, wsRetryDelay);
+      wsRetryDelay = Math.min(wsRetryDelay * 1.5, 15000);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        handleServerMessage(msg);
+      } catch (e) {
+        // Ignore malformed messages
+      }
+    };
   }
 
-  function updateNodeState(toolName, status, output = null) {
-    document.querySelectorAll(".tree-card").forEach((card) => {
-      if (card.innerText.toLowerCase().includes(toolName.toLowerCase())) {
-        card.className = `tree-card ${status}`;
-        const pill = card.querySelector(".node-status-pill");
-        if (pill) {
-          pill.className = `node-status-pill ${status}`;
-          pill.textContent = status;
+  function handleServerMessage(msg) {
+    if (msg.type === 'event') {
+      const topic = msg.topic || '';
+      const data = msg.data || {};
+
+      if (topic === 'agent.started') {
+        setAgentState('thinking');
+        appendThinking();
+      }
+
+      if (topic === 'agent.thinking') {
+        setAgentState('thinking');
+      }
+
+      if (topic === 'agent.state') {
+        setAgentState(data.state || 'idle');
+      }
+
+      if (topic === 'tool.started') {
+        removeThinking();
+        setAgentState('working');
+        currentToolAnnotation = appendToolAnnotation(
+          data.tool || 'tool',
+          'active'
+        );
+      }
+
+      if (topic === 'tool.completed') {
+        if (currentToolAnnotation) {
+          currentToolAnnotation.classList.remove('active');
+          currentToolAnnotation.classList.add('done');
+          const dur = data.duration ? `${data.duration.toFixed(1)}s` : '';
+          if (dur) {
+            currentToolAnnotation.textContent += ` \u00B7 ${dur}`;
+          }
+          currentToolAnnotation = null;
         }
       }
-    });
-  }
 
-  if (btnCloseDrawer && flowDrawer) {
-    btnCloseDrawer.addEventListener("click", () => flowDrawer.classList.remove("open"));
-  }
-
-  if (btnResetWorkflow && workflowTreeNodes) {
-    btnResetWorkflow.addEventListener("click", () => {
-      workflowTreeNodes.innerHTML = "<p style='color:#64748b;'>Awaiting task execution plan...</p>";
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 7. Tasks Engine View
-  // ---------------------------------------------------------------------------
-  async function loadTasks() {
-    if (!tasksGrid) return;
-    try {
-      const res = await fetch("/api/tasks");
-      if (res.ok) {
-        const data = await res.json();
-        renderTasks(data.tasks || []);
+      if (topic === 'tool.failed') {
+        if (currentToolAnnotation) {
+          currentToolAnnotation.classList.remove('active');
+          currentToolAnnotation.classList.add('failed');
+          currentToolAnnotation = null;
+        }
       }
+
+      if (topic === 'agent.completed') {
+        setAgentState('idle');
+        removeThinking();
+      }
+
+      if (topic === 'permission.requested') {
+        showPermissionModal(data);
+      }
+
+      // Mascot state events (map to agent state)
+      if (topic === 'mascot.state_changed') {
+        const stateMap = {
+          idle: 'idle', listening: 'listening', thinking: 'thinking',
+          working: 'working', completed: 'idle', error: 'error',
+          perked: 'thinking', focused: 'working', thoughtful: 'thinking',
+          happy: 'idle'
+        };
+        setAgentState(stateMap[data.state] || 'idle');
+      }
+    }
+
+    if (msg.type === 'chat_result') {
+      removeThinking();
+      setAgentState('idle');
+      const text = stripEmojis(msg.response || msg.data?.response || '');
+      if (text) {
+        appendMessage('Victor', text);
+        if (ttsEnabled) speakText(text);
+      }
+    }
+  }
+
+
+  // ── Tasks ──────────────────────────────────────────────────────
+
+  async function loadTasks() {
+    try {
+      const res = await fetch('/api/tasks');
+      const data = await res.json();
+      renderTasks(data.tasks || []);
     } catch (e) {
-      console.warn("Failed to load tasks:", e);
+      tasksContainer.innerHTML = '<div class="tasks-empty">Could not load tasks.</div>';
     }
   }
 
   function renderTasks(tasks) {
-    if (!tasksGrid) return;
-    tasksGrid.innerHTML = "";
-    if (badgeTasksCount) badgeTasksCount.textContent = tasks.length;
-
-    if (tasks.length === 0) {
-      tasksGrid.innerHTML = `<div class="card-box" style="grid-column: 1/-1;"><p class="card-desc">No tasks executed yet. Ask Victor to perform an autonomous multi-step workflow!</p></div>`;
+    tasksContainer.innerHTML = '';
+    if (!tasks.length) {
+      tasksContainer.innerHTML = '<div class="tasks-empty">No tasks yet. Victor creates tasks when working on multi-step requests.</div>';
       return;
     }
 
-    tasks.forEach((t) => {
-      const card = document.createElement("div");
-      card.className = "task-card";
+    // Sort: active first, then by most recent
+    tasks.sort((a, b) => {
+      if (a.status === 'running' && b.status !== 'running') return -1;
+      if (b.status === 'running' && a.status !== 'running') return 1;
+      return 0;
+    });
 
-      const stepsHtml = (t.steps || []).map((s) => `
-        <div class="task-step-item ${s.status}">
-          <span class="step-indicator"></span>
-          <span>${escapeHtml(s.name)}</span>
-        </div>
-      `).join("");
+    tasks.forEach(task => {
+      const item = document.createElement('div');
+      item.className = 'task-item';
 
-      card.innerHTML = `
-        <div class="task-card-header">
-          <span class="task-goal">${escapeHtml(t.goal)}</span>
-          <span class="task-status-tag ${t.status}">${t.status}</span>
-        </div>
-        <div class="task-steps-list">
-          ${stepsHtml || '<span style="color:#64748b;font-size:11px;">Single-step execution</span>'}
-        </div>
-        <div class="task-meta-footer">
-          Duration: ${t.duration || 0}s &bull; ID: ${t.id}
-        </div>
-      `;
-      tasksGrid.appendChild(card);
+      const title = document.createElement('div');
+      title.className = 'task-title';
+      title.textContent = task.goal || task.title || 'Untitled task';
+
+      const steps = document.createElement('ul');
+      steps.className = 'task-steps';
+
+      (task.steps || []).forEach(step => {
+        const li = document.createElement('li');
+        li.className = 'task-step';
+
+        const icon = document.createElement('span');
+        icon.className = 'step-icon';
+        if (step.status === 'completed') {
+          icon.classList.add('done');
+          icon.innerHTML = '&#10003;';
+        } else if (step.status === 'running') {
+          icon.classList.add('active');
+          icon.innerHTML = '&#9679;';
+        } else {
+          icon.classList.add('pending');
+          icon.innerHTML = '&#9675;';
+        }
+
+        const label = document.createElement('span');
+        label.textContent = step.name || step.tool || 'Step';
+
+        li.appendChild(icon);
+        li.appendChild(label);
+        steps.appendChild(li);
+      });
+
+      item.appendChild(title);
+      item.appendChild(steps);
+
+      if (task.status === 'completed' && task.duration) {
+        const dur = document.createElement('div');
+        dur.className = 'task-duration';
+        dur.textContent = `Finished in ${task.duration.toFixed(1)}s`;
+        item.appendChild(dur);
+      }
+
+      if (task.outcome) {
+        const result = document.createElement('div');
+        result.className = 'task-result';
+        result.textContent = task.outcome;
+        item.appendChild(result);
+      }
+
+      tasksContainer.appendChild(item);
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 8. Memory View
-  // ---------------------------------------------------------------------------
+
+  // ── Memory ─────────────────────────────────────────────────────
+
   async function loadMemory() {
     try {
-      const res = await fetch("/api/memory");
-      if (res.ok) {
-        const data = await res.json();
-        renderMemoryFacts(data.facts || []);
-        renderMemoryPreferences(data.preferences || {});
-      }
+      const res = await fetch('/api/memory');
+      const data = await res.json();
+      renderFacts(data.facts || []);
+      renderPrefs(data.preferences || {});
     } catch (e) {
-      console.warn("Memory load fail:", e);
+      // Silent
     }
   }
 
-  function renderMemoryFacts(facts) {
-    if (!factsList) return;
-    factsList.innerHTML = "";
-    if (facts.length === 0) {
-      factsList.innerHTML = `<p class="card-desc">No facts remembered yet.</p>`;
-      return;
+  function renderFacts(facts) {
+    factsList.innerHTML = '';
+    facts.forEach(fact => {
+      const li = document.createElement('li');
+      li.className = 'memory-item';
+
+      const bullet = document.createElement('span');
+      bullet.className = 'memory-bullet';
+      bullet.innerHTML = '&bull;';
+
+      const text = document.createElement('span');
+      text.className = 'memory-text';
+      text.textContent = fact.content || fact.text || fact;
+
+      const del = document.createElement('button');
+      del.className = 'memory-delete';
+      del.textContent = 'remove';
+      del.addEventListener('click', async () => {
+        const factId = fact.id || fact.fact_id;
+        if (factId) {
+          await fetch(`/api/memory/fact/${factId}`, { method: 'DELETE' });
+          loadMemory();
+        }
+      });
+
+      li.appendChild(bullet);
+      li.appendChild(text);
+      li.appendChild(del);
+      factsList.appendChild(li);
+    });
+  }
+
+  function renderPrefs(prefs) {
+    prefsList.innerHTML = '';
+    const entries = Array.isArray(prefs) ? prefs : Object.entries(prefs);
+    entries.forEach(entry => {
+      const li = document.createElement('li');
+      li.className = 'memory-item';
+
+      const bullet = document.createElement('span');
+      bullet.className = 'memory-bullet';
+      bullet.innerHTML = '&bull;';
+
+      const text = document.createElement('span');
+      text.className = 'memory-text';
+      if (Array.isArray(entry)) {
+        text.textContent = `${entry[0]}: ${entry[1]}`;
+      } else {
+        text.textContent = `${entry.key || ''}: ${entry.value || ''}`;
+      }
+
+      li.appendChild(bullet);
+      li.appendChild(text);
+      prefsList.appendChild(li);
+    });
+  }
+
+  btnAddFact.addEventListener('click', async () => {
+    const text = factInput.value.trim();
+    if (!text) return;
+    await fetch('/api/memory/fact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: text })
+    });
+    factInput.value = '';
+    loadMemory();
+  });
+
+  factInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnAddFact.click();
     }
+  });
 
-    facts.forEach((f) => {
-      const item = document.createElement("div");
-      item.className = "memory-item-pill";
-      item.innerHTML = `
-        <span>${escapeHtml(f.fact)}</span>
-        <button class="btn-delete-mem" data-id="${f.id}">Forget</button>
-      `;
-      item.querySelector(".btn-delete-mem").addEventListener("click", async () => {
-        await fetch(`/api/memory/fact/${f.id}`, { method: "DELETE" });
-        loadMemory();
-      });
-      factsList.appendChild(item);
-    });
-  }
 
-  function renderMemoryPreferences(prefs) {
-    if (!preferencesList) return;
-    preferencesList.innerHTML = "";
-    const keys = Object.keys(prefs);
-    if (keys.length === 0) {
-      preferencesList.innerHTML = `<p class="card-desc">No preferences configured.</p>`;
-      return;
-    }
+  // ── Tools ──────────────────────────────────────────────────────
 
-    keys.forEach((k) => {
-      const item = document.createElement("div");
-      item.className = "memory-item-pill";
-      item.innerHTML = `
-        <span><strong>${escapeHtml(k)}:</strong> ${escapeHtml(prefs[k])}</span>
-        <button class="btn-delete-mem" data-key="${k}">Reset</button>
-      `;
-      item.querySelector(".btn-delete-mem").addEventListener("click", async () => {
-        await fetch(`/api/memory/preference/${k}`, { method: "DELETE" });
-        loadMemory();
-      });
-      preferencesList.appendChild(item);
-    });
-  }
-
-  if (btnAddFact && newFactInput) {
-    btnAddFact.addEventListener("click", async () => {
-      const val = newFactInput.value.trim();
-      if (!val) return;
-      await fetch("/api/memory/fact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fact: val }),
-      });
-      newFactInput.value = "";
-      loadMemory();
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 9. Tools View
-  // ---------------------------------------------------------------------------
   async function loadTools() {
-    if (!toolsGrid) return;
     try {
-      const res = await fetch("/api/tools");
-      if (res.ok) {
-        const data = await res.json();
-        renderTools(data.tools || []);
-      }
+      const res = await fetch('/api/tools');
+      const data = await res.json();
+      const tools = data.tools || data;
+      renderTools(Array.isArray(tools) ? tools : []);
     } catch (e) {
-      console.warn("Tools load fail:", e);
+      toolsList.innerHTML = '<div class="tasks-empty">Could not load tools.</div>';
     }
   }
 
   function renderTools(tools) {
-    if (!toolsGrid) return;
-    toolsGrid.innerHTML = "";
-    tools.forEach((t) => {
-      const card = document.createElement("div");
-      card.className = "tool-card";
-      card.innerHTML = `
-        <div class="tool-header">
-          <span class="tool-name">${escapeHtml(t.name.toUpperCase())}</span>
-          <span class="tool-perm ${t.permission}">${t.permission}</span>
-        </div>
-        <div class="tool-desc">${escapeHtml(t.description)}</div>
-      `;
-      toolsGrid.appendChild(card);
+    toolsList.innerHTML = '';
+    tools.forEach(tool => {
+      const row = document.createElement('div');
+      row.className = 'tool-row';
+
+      const name = document.createElement('span');
+      name.className = 'tool-name';
+      name.textContent = tool.name;
+
+      const desc = document.createElement('span');
+      desc.className = 'tool-desc';
+      desc.textContent = tool.description || '';
+
+      const perm = document.createElement('span');
+      perm.className = 'tool-perm';
+      const permLevel = (tool.permission || 'safe').toLowerCase();
+      perm.classList.add(permLevel);
+      perm.textContent = permLevel;
+
+      row.appendChild(name);
+      row.appendChild(desc);
+      row.appendChild(perm);
+      toolsList.appendChild(row);
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 10. Models View
-  // ---------------------------------------------------------------------------
-  async function loadModels() {
+
+  // ── Settings ───────────────────────────────────────────────────
+
+  async function loadSettings() {
     try {
-      const res = await fetch("/api/models");
-      if (res.ok) {
-        const data = await res.json();
-        if (modelActiveVal) modelActiveVal.textContent = data.current;
-        if (modelProviderVal) modelProviderVal.textContent = data.provider.toUpperCase();
-        renderModelsList(data.available || [], data.current);
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      shellStatus.textContent = data.security?.allow_shell ? 'enabled' : 'disabled';
+    } catch (e) {}
+
+    // Load models
+    try {
+      const res = await fetch('/api/models');
+      const data = await res.json();
+      modelSelect.innerHTML = '';
+      const models = data.available_models || [];
+      const current = data.current_model || '';
+
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        if (m === current) opt.selected = true;
+        modelSelect.appendChild(opt);
+      });
+
+      if (!models.length) {
+        const opt = document.createElement('option');
+        opt.textContent = current || 'qwen2:1.5b';
+        modelSelect.appendChild(opt);
       }
-    } catch (e) {
-      console.warn("Models load fail:", e);
-    }
+    } catch (e) {}
+
+    // Populate voice list
+    populateVoices();
   }
 
-  function renderModelsList(models, current) {
-    if (!modelsList) return;
-    modelsList.innerHTML = "";
-    models.forEach((m) => {
-      const item = document.createElement("div");
-      item.className = "model-opt-item";
-      const isCurrent = m === current;
-      item.innerHTML = `
-        <span><strong>${escapeHtml(m)}</strong></span>
-        <button class="btn-secondary-sm" ${isCurrent ? "disabled" : ""}>
-          ${isCurrent ? "Active" : "Switch"}
-        </button>
-      `;
-      if (!isCurrent) {
-        item.querySelector("button").addEventListener("click", async () => {
-          await fetch("/api/models/switch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model_name: m }),
-          });
-          loadModels();
-        });
-      }
-      modelsList.appendChild(item);
+  modelSelect.addEventListener('change', async () => {
+    try {
+      await fetch('/api/models/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_name: modelSelect.value })
+      });
+      modelName.textContent = modelSelect.value;
+    } catch (e) {}
+  });
+
+  // TTS toggle
+  ttsToggle.addEventListener('click', () => {
+    ttsEnabled = !ttsEnabled;
+    ttsToggle.classList.toggle('on', ttsEnabled);
+  });
+
+  function populateVoices() {
+    if (!speechSynth) return;
+    const voices = speechSynth.getVoices();
+    voiceSelect.innerHTML = '';
+    voices.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      voiceSelect.appendChild(opt);
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 11. Permission Prompt Modal
-  // ---------------------------------------------------------------------------
-  function promptPermissionModal(req) {
-    activePermRequestId = req.id;
-    if (permTitle) permTitle.textContent = `Victor wants to execute: ${req.action}`;
-    if (permDesc) permDesc.textContent = `Action targets: ${req.target}`;
-    if (permDetails) permDetails.textContent = JSON.stringify(req.details, null, 2);
-    if (permissionModal) permissionModal.classList.add("show");
-    setMascotState("waiting", "Needs your permission to continue.");
+  if (speechSynth && speechSynth.onvoiceschanged !== undefined) {
+    speechSynth.onvoiceschanged = populateVoices;
+  }
+
+  voiceSelect.addEventListener('change', () => {
+    const voices = speechSynth ? speechSynth.getVoices() : [];
+    selectedVoice = voices[parseInt(voiceSelect.value)] || null;
+  });
+
+  function speakText(text) {
+    if (!speechSynth || !ttsEnabled) return;
+    speechSynth.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    if (selectedVoice) utt.voice = selectedVoice;
+    utt.rate = 1.0;
+    utt.pitch = 1.0;
+    speechSynth.speak(utt);
+  }
+
+  // Launch mascot
+  btnLaunchMascot.addEventListener('click', async () => {
+    try {
+      await fetch('/api/mascot/launch', { method: 'POST' });
+      btnLaunchMascot.textContent = 'Launched';
+      setTimeout(() => { btnLaunchMascot.textContent = 'Launch'; }, 2000);
+    } catch (e) {}
+  });
+
+
+  // ── Voice Input (STT) ─────────────────────────────────────────
+
+  if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      chatInput.value = transcript;
+      sendMessage();
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      btnMic.classList.remove('active');
+      setAgentState('idle');
+    };
+
+    recognition.onerror = () => {
+      isListening = false;
+      btnMic.classList.remove('active');
+    };
+  }
+
+  btnMic.addEventListener('click', () => {
+    if (!recognition) return;
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+      isListening = true;
+      btnMic.classList.add('active');
+      setAgentState('listening');
+    }
+  });
+
+
+  // ── Permission Modal ───────────────────────────────────────────
+
+  let pendingPermissionId = null;
+
+  function showPermissionModal(data) {
+    pendingPermissionId = data.request_id || data.id;
+    permDesc.textContent = data.description || 'Victor wants to perform an action.';
+    permDetails.textContent = data.details || data.action || 'system action';
+    permModal.classList.add('visible');
   }
 
   async function resolvePermission(decision) {
-    if (!activePermRequestId) return;
-    await fetch("/api/permissions/respond", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ request_id: activePermRequestId, decision }),
-    });
-    if (permissionModal) permissionModal.classList.remove("show");
-    activePermRequestId = null;
-    setMascotState("working");
+    if (!pendingPermissionId) return;
+    permModal.classList.remove('visible');
+    try {
+      await fetch('/api/permissions/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request_id: pendingPermissionId, decision })
+      });
+    } catch (e) {}
+    pendingPermissionId = null;
   }
 
-  if (btnPermAllowOnce) btnPermAllowOnce.addEventListener("click", () => resolvePermission("allow_once"));
-  if (btnPermAlwaysAllow) btnPermAlwaysAllow.addEventListener("click", () => resolvePermission("always_allow"));
-  if (btnPermDeny) btnPermDeny.addEventListener("click", () => resolvePermission("deny"));
+  btnPermAllow.addEventListener('click', () => resolvePermission('allow_once'));
+  btnPermAlways.addEventListener('click', () => resolvePermission('always_allow'));
+  btnPermDeny.addEventListener('click', () => resolvePermission('deny'));
 
-  // ---------------------------------------------------------------------------
-  // 12. Desktop Mascot Launcher
-  // ---------------------------------------------------------------------------
-  async function launchDesktopMascot() {
+
+  // ── Initialization ─────────────────────────────────────────────
+
+  async function init() {
+    // Load status
     try {
-      const res = await fetch("/api/mascot/launch", { method: "POST" });
+      const res = await fetch('/api/status');
       const data = await res.json();
-      if (data.status === "launched") {
-        alert("Desktop mascot launched! Look at your desktop.");
-      } else {
-        alert(`Launch status: ${data.message}`);
-      }
-    } catch (e) {
-      alert(`Could not launch desktop mascot: ${e}`);
-    }
+      modelName.textContent = data.model || 'qwen2:1.5b';
+    } catch (e) {}
+
+    // Connect WebSocket
+    initWebSocket();
   }
 
-  if (btnLaunchDesktopMascot) btnLaunchDesktopMascot.addEventListener("click", launchDesktopMascot);
-  if (btnSettingsLaunchMascot) btnSettingsLaunchMascot.addEventListener("click", launchDesktopMascot);
+  init();
 
-  // ---------------------------------------------------------------------------
-  // Initial Status & Link
-  // ---------------------------------------------------------------------------
-  async function loadInitialStatus() {
-    try {
-      const res = await fetch("/api/status");
-      if (res.ok) {
-        const data = await res.json();
-        if (activeModelPill) activeModelPill.textContent = (data.model || "QWEN 1.5B").toUpperCase();
-        if (badgeTasksCount) badgeTasksCount.textContent = data.tasks_count || 0;
-      }
-    } catch (e) {
-      console.warn("Status offline:", e);
-    }
-  }
-
-  loadInitialStatus();
-  initWebSocket();
-});
+})();

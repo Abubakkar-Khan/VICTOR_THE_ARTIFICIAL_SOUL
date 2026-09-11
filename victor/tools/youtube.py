@@ -95,3 +95,34 @@ class YouTubeTool(BaseTool):
             "count": len(results),
             "videos": results,
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_query(m) -> dict:
+            query = m.group(1).strip().rstrip("?.!")
+            if query:
+                return {"query": query}
+            return None
+        
+        return [
+            {"pattern": r"^(?:search\s+youtube\s+for|open\s+youtube\s+and\s+search(?:\s+for)?|youtube|find\s+videos?\s+(?:on|about))\s+(.+)$", "extract": extract_query},
+            {"pattern": r"^(.+)\s+(?:on|in)\s+youtube\??$", "extract": extract_query}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            q = out.get("query", "")
+            videos = out.get("videos", [])
+            if not videos:
+                return f"I searched YouTube for \"{q}\" but found no videos."
+            lines = [f"I searched YouTube for \"{q}\" and found {len(videos)} videos:"]
+            for idx, v in enumerate(videos, 1):
+                title = v.get("title", "")
+                url = v.get("url", "")
+                desc = v.get("description", "")
+                lines.append(f"{idx}. [{title}]({url})\n   {desc}")
+            return "\n\n".join(lines)
+        return str(out)
+

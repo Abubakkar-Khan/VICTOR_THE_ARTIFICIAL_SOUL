@@ -51,3 +51,20 @@ class NotificationTool(BaseTool):
             "message": msg,
             "status": "delivered",
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_msg(m) -> dict:
+            return {"message": m.group(1).strip()}
+            
+        return [
+            {"pattern": r"^(?:notify(?:\s+me)?|send\s+notification|alert\s+me)\s+(.+)$", "extract": extract_msg}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            return f"Notification delivered: \"{out.get('message', '')}\"."
+        return str(out)
+

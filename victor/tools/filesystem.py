@@ -77,3 +77,31 @@ class FilesystemTool(BaseTool):
             "truncated": truncated,
             "content": "".join(selected_lines)
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_read(m) -> dict:
+            filepath = m.group(1).strip()
+            if "." in filepath or "/" in filepath or "\\" in filepath:
+                return {"action": "read", "path": filepath}
+            return None
+
+        def extract_list(m) -> dict:
+            dirpath = m.group(1).strip() or "."
+            return {"action": "list", "path": dirpath}
+
+        return [
+            {"pattern": r"^(?:read(?:\s+file)?|inspect(?:\s+file)?|view(?:\s+file)?|show(?:\s+file)?)\s+([a-zA-Z0-9_\-\.\/\\~]+)$", "extract": extract_read},
+            {"pattern": r"^(?:list\s+files(?:\s+in)?|what\s+files\s+are\s+in|show\s+directory)\s+([a-zA-Z0-9_\-\.\/\\~]*)$", "extract": extract_list}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            path = out.get("path", "")
+            lines_count = out.get("total_lines", 0)
+            content = out.get("content", "")
+            return f"Here is the content of `{path}` ({lines_count} lines):\n\n```\n{content[:1000]}\n```"
+        return str(out)
+

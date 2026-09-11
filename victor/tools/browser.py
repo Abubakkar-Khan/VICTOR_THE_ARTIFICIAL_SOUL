@@ -77,3 +77,31 @@ class BrowserTool(BaseTool):
             "truncated": truncated,
             "content": content
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_url(m) -> dict:
+            url = m.group(0)
+            return {"url": url}
+
+        def extract_cmd(m) -> dict:
+            target = m.group(1).strip()
+            if not target.startswith("http"):
+                target = f"https://{target}"
+            return {"url": target}
+
+        return [
+            {"pattern": r"https?://[^\s]+", "extract": extract_url},
+            {"pattern": r"^(?:browse|visit|open url)\s+(.+)$", "extract": extract_cmd}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            title = out.get("title", "")
+            url = out.get("url", "")
+            content = out.get("content", "")
+            return f"Here is the relevant content from [{title}]({url}):\n\n{content[:700]}..."
+        return str(out)
+

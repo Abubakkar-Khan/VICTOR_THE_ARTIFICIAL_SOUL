@@ -82,3 +82,34 @@ class WebSearchTool(BaseTool):
             "count": len(results),
             "results": results
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_query(m) -> dict:
+            query = m.group(1).strip().rstrip("?.!")
+            if query:
+                return {"query": query}
+            return None
+
+        return [
+            {"pattern": r"^(?:search(?:\s+the\s+web)?(?:\s+for)?|look\s+up|google|find(?:\s+information)?\s+about)\s+(.+)$", "extract": extract_query},
+            {"pattern": r"^(?:what\s+is\s+the\s+latest|who\s+won|recent\s+news\s+on)\s+(.+)$", "extract": extract_query}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            query = out.get("query", "")
+            hits = out.get("results", [])
+            if not hits:
+                return f"I searched the web for \"{query}\" but found no matching results."
+            lines = [f"I searched for \"{query}\" and retrieved {len(hits)} relevant sources:"]
+            for idx, item in enumerate(hits, 1):
+                title = item.get("title", "")
+                url = item.get("url", "")
+                snippet = item.get("snippet", "")
+                lines.append(f"{idx}. [{title}]({url})\n   {snippet}")
+            return "\n\n".join(lines)
+        return str(out)
+

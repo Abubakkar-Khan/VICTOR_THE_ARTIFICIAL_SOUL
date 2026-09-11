@@ -10,7 +10,7 @@ client = TestClient(app)
 def test_root_endpoint():
     res = client.get("/")
     assert res.status_code == 200
-    assert "VICTOR" in res.text
+    assert "Victor" in res.text
 
 
 def test_api_status():

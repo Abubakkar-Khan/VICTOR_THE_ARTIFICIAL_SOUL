@@ -112,3 +112,38 @@ class CalculatorTool(BaseTool):
             "result": result,
             "formatted": f"{expr} = {result}"
         }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_math(m) -> dict:
+            groups = m.groups()
+            text = m.string.lower()
+            if len(groups) == 2 and "of" in text:
+                expr = f"{groups[1]} * ({groups[0]} / 100)"
+                return {"expression": expr}
+            elif groups:
+                raw_expr = groups[0].strip().rstrip("=?").strip()
+                import re
+                if re.search(r"\d", raw_expr):
+                    return {"expression": raw_expr}
+            return None
+
+        return [
+            {"pattern": r"^(?:calculate|compute|solve|eval(?:uate)?)\s+(.+)$", "extract": extract_math},
+            {"pattern": r"^(?:what(?:'s|\s+is))\s+([0-9\.\s\+\-\*\/\^\(\)\%\,]+(?:\s*[\+\-\*\/\^\%]\s*[0-9\.\s\+\-\*\/\^\(\)\%\,]+)+)\??$", "extract": extract_math},
+            {"pattern": r"^(?:what(?:'s|\s+is))\s+(?:the\s+)?(?:value|result)\s+of\s+(.+)\??$", "extract": extract_math},
+            {"pattern": r"^how\s+much\s+is\s+([0-9\.\s\+\-\*\/\^\(\)\%\,]+(?:\s*[\+\-\*\/\^\%]\s*[0-9\.\s\+\-\*\/\^\(\)\%\,]+)+)\??$", "extract": extract_math},
+            {"pattern": r"^how\s+much\s+is\s+([0-9\.]+)%\s+of\s+([0-9\.]+)\??$", "extract": extract_math},
+            {"pattern": r"^([0-9\.\s\+\-\*\/\^\(\)\%\,]{2,}\s*[\+\-\*\/\^]\s*[0-9\.\s\+\-\*\/\^\(\)\%\,]+)\s*=?\??$", "extract": extract_math},
+            {"pattern": r"^(?:sqrt|sin|cos|tan|log|exp)\s*\([0-9\.\s\+\-\*\/]+\)$", "extract": extract_math},
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            expr = out.get("expression", "")
+            res = out.get("result", "")
+            formatted_val = f"{res:,}" if isinstance(res, (int, float)) else str(res)
+            return f"{expr} is {formatted_val}."
+        return str(out)

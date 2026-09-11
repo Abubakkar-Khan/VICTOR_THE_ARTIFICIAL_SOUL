@@ -3,371 +3,203 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Victor — The Artificial Soul</title>
+  <title>Victor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- Permission Confirmation Dialog Modal -->
-  <div id="permission-modal" class="modal-backdrop">
-    <div class="modal-card">
-      <div class="modal-header">
-        <span class="modal-tag">PERMISSION REQUIRED</span>
-        <span id="perm-action-badge" class="badge-controlled">[CONFIRMATION]</span>
-      </div>
-      <div class="modal-body">
-        <h3 id="perm-title" class="modal-title">Victor wants to execute an action</h3>
-        <p id="perm-desc" class="modal-desc">Please confirm whether to allow this operation.</p>
-        <div id="perm-details" class="modal-code">Target: system</div>
-      </div>
+
+  <!-- Permission Modal -->
+  <div id="permission-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-heading">Victor wants to perform an action</div>
+      <p id="perm-desc" class="modal-text">Please confirm whether to allow this.</p>
+      <div id="perm-details" class="modal-detail">action details</div>
       <div class="modal-actions">
-        <button id="btn-perm-allow-once" class="btn-primary">Allow once</button>
-        <button id="btn-perm-always-allow" class="btn-secondary">Always allow</button>
-        <button id="btn-perm-deny" class="btn-danger">Deny</button>
+        <button id="btn-perm-deny" class="modal-btn danger">Deny</button>
+        <button id="btn-perm-always" class="modal-btn secondary">Always allow</button>
+        <button id="btn-perm-allow" class="modal-btn primary">Allow</button>
       </div>
     </div>
   </div>
 
-  <div class="app-shell">
-    <!-- Left Navigation Sidebar -->
-    <aside class="app-sidebar">
-      <!-- Mascot Profile Cluster -->
-      <div class="mascot-profile-card">
-        <div class="mascot-avatar-wrap">
-          <!-- Animated In-App Mascot SVG Canvas -->
-          <svg id="mascot-svg" class="mascot-svg" viewBox="0 0 100 100">
-            <!-- Aura / Glow -->
-            <circle id="mascot-aura" cx="50" cy="50" r="44" class="mascot-aura" />
-            <!-- Antenna -->
-            <line x1="50" y1="20" x2="50" y2="8" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-            <circle id="mascot-ant-bulb" cx="50" cy="6" r="4" class="mascot-ant-bulb" />
-            <!-- Head / Body -->
-            <circle cx="50" cy="52" r="34" class="mascot-body" />
-            <!-- Cheeks -->
-            <circle cx="32" cy="58" r="4" class="mascot-cheek" />
-            <circle cx="68" cy="58" r="4" class="mascot-cheek" />
-            <!-- Eyes Left & Right -->
-            <g id="mascot-eyes">
-              <ellipse id="eye-left" cx="37" cy="48" rx="4.5" ry="5.5" class="mascot-eye" />
-              <ellipse id="eye-right" cx="63" cy="48" rx="4.5" ry="5.5" class="mascot-eye" />
-            </g>
-            <!-- Mouth -->
-            <path id="mascot-mouth" d="M 44,60 Q 50,65 56,60" class="mascot-mouth" />
-          </svg>
-          <div id="mascot-status-beacon" class="mascot-beacon online"></div>
-        </div>
+  <div class="app">
 
-        <div class="mascot-info">
-          <div class="brand-row">
-            <span class="brand-name">VICTOR</span>
-            <span id="mascot-state-pill" class="state-pill idle">IDLE</span>
-          </div>
-          <span id="mascot-tagline" class="brand-tagline">The Artificial Soul</span>
-        </div>
-
-        <!-- Mascot Speech Bubble -->
-        <div id="mascot-speech-bubble" class="mascot-speech">
-          <span id="mascot-speech-text">Ready to help you explore and create.</span>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-name">Victor</span>
+        <div class="brand-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">idle</span>
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
       <nav class="sidebar-nav">
         <button class="nav-item active" data-view="chat">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
           <span>Chat</span>
         </button>
-        <button class="nav-item" data-view="workflow">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>Workflow</span>
-          <span id="wf-beacon-dot" class="live-dot"></span>
-        </button>
         <button class="nav-item" data-view="tasks">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
           <span>Tasks</span>
-          <span id="badge-tasks-count" class="count-badge">0</span>
         </button>
         <button class="nav-item" data-view="memory">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
           <span>Memory</span>
         </button>
         <button class="nav-item" data-view="tools">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
           <span>Tools</span>
         </button>
-        <button class="nav-item" data-view="models">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
-          <span>Models</span>
-        </button>
         <button class="nav-item" data-view="settings">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
           <span>Settings</span>
         </button>
       </nav>
 
-      <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <button id="btn-launch-desktop-mascot" class="btn-mascot-launch" title="Launch Always-on-Top Desktop Mascot">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
-          <span>Float Mascot</span>
-        </button>
+        <span class="sidebar-footer-text" id="model-name">qwen2:1.5b</span>
       </div>
     </aside>
 
-    <!-- Main Workspace Surface -->
-    <main class="app-workspace">
-      <!-- Top Control Bar -->
+    <!-- Workspace -->
+    <main class="workspace">
       <header class="workspace-header">
-        <div class="header-left">
-          <h2 id="view-title" class="view-headline">Conversation</h2>
-          <span id="active-model-pill" class="model-badge">QWEN 1.5B</span>
-        </div>
-
-        <div class="header-right">
-          <button id="btn-tts-toggle" class="header-pill active" title="Toggle Victor Voice TTS">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-            <span id="tts-label">Voice: On</span>
-          </button>
-          <button id="btn-export-chat" class="header-pill">Export</button>
-          <button id="btn-clear-chat" class="header-pill danger">Clear</button>
+        <span class="view-title" id="view-title">Chat</span>
+        <div class="header-actions">
+          <button class="header-btn" id="btn-clear" title="Clear conversation">clear</button>
         </div>
       </header>
 
-      <!-- VIEW 1: CHAT -->
-      <section id="view-chat" class="view-panel active">
-        <div id="chat-feed" class="chat-feed">
-          <div class="chat-row victor-row">
-            <div class="avatar-capsule">V</div>
-            <div class="speech-content">
-              <div class="speech-header">
-                <span class="speech-author">Victor</span>
-                <span class="speech-time">Ready</span>
-              </div>
-              <div class="speech-body">
-                Hello! I am Victor, your artificial desktop companion.
-                I can browse websites, search YouTube, calculate math, read files, launch applications, and inspect your computer. What would you like to do?
-              </div>
+      <div class="workspace-content">
+
+        <!-- Chat View -->
+        <section id="view-chat" class="view-panel active">
+          <div class="chat-messages" id="chat-feed">
+            <div class="chat-empty" id="chat-empty">
+              <span class="chat-empty-name">Victor</span>
+              <span class="chat-empty-hint">Ask me something, or tell me to do something. I can search the web, find videos, read files, open apps, and more.</span>
             </div>
           </div>
-        </div>
-
-        <!-- Floating Input Dock -->
-        <div class="chat-input-dock">
-          <!-- Suggestion Chips -->
-          <div class="suggestion-chips">
-            <button class="chip-btn" data-query="Search YouTube for compiler construction tutorials">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>
-              <span>YouTube Tutorials</span>
-            </button>
-            <button class="chip-btn" data-query="Search the web for latest breakthroughs in small AI models">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <span>Search Web</span>
-            </button>
-            <button class="chip-btn" data-query="Calculate 144 * 12 + 256">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-              <span>Calculate</span>
-            </button>
-            <button class="chip-btn" data-query="Read file config/victor.yaml">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span>Read File</span>
-            </button>
-            <button class="chip-btn" data-query="Open Chrome">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
-              <span>Open Chrome</span>
-            </button>
-            <button class="chip-btn" data-query="Remember that I prefer YouTube tutorials under 20 minutes">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              <span>Save Preference</span>
-            </button>
-          </div>
-
-          <div class="input-capsule-bar">
-            <!-- Voice Input Mic Button -->
-            <button id="btn-voice-mic" class="mic-toggle-btn" title="Click to speak (Web Speech API)">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            </button>
-
-            <input
-              type="text"
-              id="user-chat-input"
-              placeholder="Ask Victor naturally, e.g. 'Search YouTube for compiler tutorials'..."
-              autocomplete="off"
-              spellcheck="false"
-            />
-
-            <button id="btn-chat-send" class="btn-send-capsule">
-              <span>Send</span>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- VIEW 2: WORKFLOW (Live Hierarchical Execution Graph) -->
-      <section id="view-workflow" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Live Execution Flow</span>
-            <span class="panel-subtitle">Real-time hierarchical plan tree &amp; recursive telemetry</span>
-          </div>
-          <button id="btn-reset-workflow" class="btn-secondary-sm">Reset Tree</button>
-        </div>
-
-        <div class="workflow-tree-container">
-          <div id="workflow-tree-nodes" class="workflow-tree-nodes">
-            <!-- Dynamically populated execution tree -->
-          </div>
-
-          <!-- Slide-out Telemetry Inspector Drawer -->
-          <aside id="flow-drawer" class="flow-drawer">
-            <div class="drawer-header">
-              <span class="drawer-headline">Node Telemetry</span>
-              <button id="btn-close-drawer" class="drawer-close-btn">✕</button>
-            </div>
-            <div class="drawer-content">
-              <div class="drawer-row">
-                <label>Node Designation</label>
-                <div id="drawer-title" class="val-text">-</div>
-              </div>
-              <div class="drawer-row">
-                <label>Operational State</label>
-                <div id="drawer-status" class="val-badge">-</div>
-              </div>
-              <div class="drawer-row">
-                <label>Data Payload</label>
-                <pre id="drawer-payload" class="code-box">// Select a node to view telemetry</pre>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <!-- VIEW 3: TASKS (Autonomous Multi-Step Task Engine) -->
-      <section id="view-tasks" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Autonomous Tasks</span>
-            <span class="panel-subtitle">Persistent multi-step task execution history</span>
-          </div>
-        </div>
-        <div id="tasks-grid" class="tasks-grid">
-          <!-- Populated dynamically with task cards -->
-        </div>
-      </section>
-
-      <!-- VIEW 4: MEMORY (Long-Term Facts & Preferences) -->
-      <section id="view-memory" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Persistent Memory</span>
-            <span class="panel-subtitle">Inspect and curate Victor's long-term facts &amp; preferences</span>
-          </div>
-        </div>
-
-        <div class="memory-layout">
-          <!-- Add Fact Form -->
-          <div class="card-box add-fact-box">
-            <h4 class="card-title">Commit New Fact to Memory</h4>
-            <div class="fact-form-row">
-              <input type="text" id="new-fact-input" placeholder="e.g. User prefers YouTube tutorials under 20 minutes" />
-              <button id="btn-add-fact" class="btn-primary-sm">Save Fact</button>
+          <div class="chat-composer">
+            <div class="composer-inner">
+              <textarea
+                id="chat-input"
+                class="composer-input"
+                placeholder="Say something..."
+                rows="1"
+              ></textarea>
+              <button class="composer-btn" id="btn-mic" title="Voice input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              </button>
+              <button class="composer-btn" id="btn-send" title="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
             </div>
           </div>
+        </section>
 
-          <div class="memory-columns">
-            <!-- Facts List -->
-            <div class="card-box memory-col">
-              <h4 class="card-title">Remembered Facts</h4>
-              <div id="facts-list" class="facts-list">
-                <!-- Populated dynamically -->
+        <!-- Tasks View -->
+        <section id="view-tasks" class="view-panel">
+          <div class="tasks-container" id="tasks-container">
+            <div class="tasks-empty" id="tasks-empty">No tasks yet. Victor creates tasks when working on multi-step requests.</div>
+          </div>
+        </section>
+
+        <!-- Memory View -->
+        <section id="view-memory" class="view-panel">
+          <div class="memory-container">
+            <div class="memory-section">
+              <div class="memory-heading">Things Victor remembers</div>
+              <ul class="memory-list" id="facts-list"></ul>
+              <div class="memory-add">
+                <input type="text" class="memory-input" id="fact-input" placeholder="Add something to remember..." />
+                <button class="memory-add-btn" id="btn-add-fact">Add</button>
+              </div>
+            </div>
+            <div class="memory-section">
+              <div class="memory-section-label">Preferences</div>
+              <ul class="memory-list" id="prefs-list"></ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tools View -->
+        <section id="view-tools" class="view-panel">
+          <div class="tools-container">
+            <div class="tools-list" id="tools-list"></div>
+          </div>
+        </section>
+
+        <!-- Settings View -->
+        <section id="view-settings" class="view-panel">
+          <div class="settings-container">
+            <div class="settings-section">
+              <div class="settings-label">Model</div>
+              <div class="settings-row">
+                <span>Active model</span>
+                <select class="settings-select" id="model-select"></select>
               </div>
             </div>
 
-            <!-- Preferences List -->
-            <div class="card-box memory-col">
-              <h4 class="card-title">User Preferences</h4>
-              <div id="preferences-list" class="preferences-list">
-                <!-- Populated dynamically -->
+            <div class="settings-section">
+              <div class="settings-label">Voice</div>
+              <div class="settings-row">
+                <span>Speech output</span>
+                <div class="settings-toggle" id="tts-toggle"></div>
+              </div>
+              <div class="settings-row">
+                <span>Voice</span>
+                <select class="settings-select" id="voice-select"></select>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-label">Companion</div>
+              <div class="settings-row">
+                <span>Desktop mascot</span>
+                <button class="settings-btn" id="btn-launch-mascot">Launch</button>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-label">Security</div>
+              <div class="settings-row">
+                <span>Shell commands</span>
+                <span class="settings-value" id="shell-status">disabled</span>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- VIEW 5: TOOLS (Unified Registry & Marketplace) -->
-      <section id="view-tools" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Capabilities &amp; Tools</span>
-            <span class="panel-subtitle">Connected agent tools, permissions, and parameters</span>
-          </div>
-        </div>
-        <div id="tools-grid" class="tools-grid">
-          <!-- Populated dynamically -->
-        </div>
-      </section>
-
-      <!-- VIEW 6: MODELS (Model Provider & Local Ollama Switcher) -->
-      <section id="view-models" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Model Architecture</span>
-            <span class="panel-subtitle">Switch local Ollama models or inspect active parameters</span>
-          </div>
-        </div>
-        <div class="models-layout">
-          <div class="card-box">
-            <h4 class="card-title">Active Model Status</h4>
-            <div class="model-stat-row">
-              <span class="stat-label">Provider</span>
-              <span id="model-provider-val" class="stat-val">Ollama</span>
-            </div>
-            <div class="model-stat-row">
-              <span class="stat-label">Active Model</span>
-              <span id="model-active-val" class="stat-val highlight">qwen2:1.5b</span>
-            </div>
-          </div>
-
-          <div class="card-box">
-            <h4 class="card-title">Available Local Models</h4>
-            <div id="models-list" class="models-list">
-              <!-- Populated dynamically -->
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- VIEW 7: SETTINGS -->
-      <section id="view-settings" class="view-panel">
-        <div class="panel-header-bar">
-          <div>
-            <span class="panel-title">Settings &amp; Controls</span>
-            <span class="panel-subtitle">Voice, permissions, security, and desktop companion configuration</span>
-          </div>
-        </div>
-        <div class="settings-layout">
-          <div class="card-box">
-            <h4 class="card-title">Voice Synthesis (TTS)</h4>
-            <div class="setting-row">
-              <label for="tts-voice-select">Voice Model</label>
-              <select id="tts-voice-select" class="form-select"></select>
-            </div>
-            <div class="setting-row">
-              <label for="tts-rate-range">Speech Rate</label>
-              <input type="range" id="tts-rate-range" min="0.8" max="1.4" step="0.1" value="1.0" />
-            </div>
-          </div>
-
-          <div class="card-box">
-            <h4 class="card-title">Desktop Companion</h4>
-            <p class="card-desc">Launch a transparent, floating desktop mascot that stays always on top while you work.</p>
-            <button id="btn-settings-launch-mascot" class="btn-primary-sm">Launch Desktop Window</button>
-          </div>
-        </div>
-      </section>
+      </div>
     </main>
+
   </div>
 
   <script src="/static/app.js"></script>

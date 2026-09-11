@@ -172,3 +172,29 @@ class ComputerTool(BaseTool):
             }
 
         raise ValueError(f"Unknown computer action: '{action}'")
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_click(m) -> dict:
+            return {"action": "click", "x": int(m.group(1)), "y": int(m.group(2))}
+            
+        return [
+            {"pattern": r"^(what is the active window|active window|what window is open|current window)$", "extract": {"action": "window_info"}},
+            {"pattern": r"^(screen size|screen resolution|display size)$", "extract": {"action": "screen_info"}},
+            {"pattern": r"^click\s+(?:mouse\s+)?(?:at\s+)?([0-9]+)[,\s]+([0-9]+)$", "extract": extract_click}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            act = out.get("action", "")
+            if act == "click":
+                return f"Clicked mouse at ({out.get('x')}, {out.get('y')})."
+            elif act == "window_info":
+                return f"Active window: \"{out.get('active_window', '')}\" at cursor ({out.get('cursor', {}).get('x')}, {out.get('cursor', {}).get('y')})."
+            elif act == "screen_info":
+                return f"Screen resolution: {out.get('screen_width')}x{out.get('screen_height')}."
+            return f"Computer action '{act}' executed successfully."
+        return str(out)
+

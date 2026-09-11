@@ -85,3 +85,11 @@ class BaseTool(ABC):
         cmd_str = f" (Slash: {self.slash_command})" if self.slash_command else ""
         param_desc = ", ".join(f"{k}: {v.get('type', 'any')}" for k, v in self.parameters.get("properties", {}).items())
         return f"- `{self.name}`{cmd_str} [{self.permission.value}]: {self.description}. Parameters: ({param_desc})"
+
+    def intent_patterns(self) -> list[dict]:
+        """Return list of intent regex dicts for routing. E.g. {"pattern": r"regex", "extract": "param_name"}"""
+        return []
+
+    def format_display(self, result: ToolResult) -> str:
+        """Return a clean, human-friendly string for displaying this tool's output."""
+        return result.to_summary_string(max_length=1500)

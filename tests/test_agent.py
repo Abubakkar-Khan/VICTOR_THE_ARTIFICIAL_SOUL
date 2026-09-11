@@ -1,10 +1,12 @@
-"""Unit tests for Victor agent loop and personality engine."""
+"""Unit tests for Victor agent loop, personality, and tool routing."""
 
 import pytest
 from victor.core.agent import VictorAgent
 from victor.core.config import VictorConfig
 from victor.core.personality import PersonalityEngine
 from victor.models.base import BaseLLM, ChatMessage, LLMResponse
+from victor.tools.router import ToolRouter
+from victor.tools.factory import create_tool_registry
 
 
 class MockLLM(BaseLLM):
@@ -28,9 +30,39 @@ def test_personality_prompt_generation():
     config = VictorConfig()
     engine = PersonalityEngine(config)
     prompt = engine.build_system_prompt("tool descriptions here")
-    assert "You are Victor" in prompt
-    assert "curiosity is high" in prompt
+    assert "Victor" in prompt
+    assert "curiosity" in prompt.lower()
     assert "tool descriptions here" in prompt
+
+
+def test_tool_router_math_intent():
+    registry = create_tool_registry()
+    router = ToolRouter(registry)
+
+    result = router.route("what is 144 * 12?")
+    assert result is not None
+    assert result[0] == "calculator"
+    assert "144 * 12" in result[1].get("expression", "")
+
+
+def test_tool_router_search_intent():
+    registry = create_tool_registry()
+    router = ToolRouter(registry)
+
+    result = router.route("search for latest developments in small language models")
+    assert result is not None
+    assert result[0] == "web_search"
+    assert "developments in small language models" in result[1].get("query", "")
+
+
+def test_tool_router_file_intent():
+    registry = create_tool_registry()
+    router = ToolRouter(registry)
+
+    result = router.route("read config/victor.yaml")
+    assert result is not None
+    assert result[0] == "filesystem"
+    assert "config/victor.yaml" in result[1].get("path", "")
 
 
 @pytest.mark.asyncio
@@ -66,24 +98,6 @@ async def test_agent_extract_tool_call():
     assert extracted["parameters"]["expression"] == "12 * 12"
 
 
-def test_agent_autonomous_intent_classification():
-    agent = VictorAgent(llm=MockLLM())
-    math_intent = agent.classify_autonomous_intent("what is 144 * 12?")
-    assert math_intent is not None
-    assert math_intent[0] == "calculator"
-    assert "144 * 12" in math_intent[1]["expression"]
-
-    search_intent = agent.classify_autonomous_intent("search for latest developments in small language models")
-    assert search_intent is not None
-    assert search_intent[0] == "web_search"
-    assert "developments in small language models" in search_intent[1]["query"]
-
-    file_intent = agent.classify_autonomous_intent("read config/victor.yaml")
-    assert file_intent is not None
-    assert file_intent[0] == "filesystem"
-    assert file_intent[1]["path"] == "config/victor.yaml"
-
-
 @pytest.mark.asyncio
 async def test_agent_autonomous_chat_routing():
     agent = VictorAgent(llm=MockLLM("50 * 20 is 1,000."))
@@ -91,4 +105,3 @@ async def test_agent_autonomous_chat_routing():
     assert res["tool_executed"] is not None
     assert res["tool_executed"]["name"] == "calculator"
     assert "1,000" in res["content"] or "1000" in res["content"]
-

@@ -112,3 +112,26 @@ class ApplicationTool(BaseTool):
                 "status": "error",
                 "error": str(e),
             }
+
+    def intent_patterns(self) -> list[dict]:
+        def extract_app(m) -> dict:
+            app_target = m.group(1).strip()
+            extra_args = m.group(2).strip() if len(m.groups()) > 1 else ""
+            return {"action": "open", "app_name": app_target, "args": extra_args}
+
+        return [
+            {"pattern": r"^(?:open|launch|start|run)\s+(chrome|google\s+chrome|edge|firefox|vscode|code|vs\s+code|notepad|terminal|powershell|cmd|explorer|calculator|spotify)\b\s*(.*)$", "extract": extract_app}
+        ]
+
+    def format_display(self, result) -> str:
+        if not result.success:
+            return f"I encountered an error executing {self.name}: {result.output}"
+        out = result.output
+        if isinstance(out, dict):
+            app = out.get("application", "")
+            status = out.get("status", "")
+            if status == "launched":
+                return f"I launched {app} for you."
+            return out.get("message", f"Application {app} status: {status}")
+        return str(out)
+
