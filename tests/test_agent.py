@@ -64,3 +64,31 @@ async def test_agent_extract_tool_call():
     assert extracted is not None
     assert extracted["tool"] == "calculator"
     assert extracted["parameters"]["expression"] == "12 * 12"
+
+
+def test_agent_autonomous_intent_classification():
+    agent = VictorAgent(llm=MockLLM())
+    math_intent = agent.classify_autonomous_intent("what is 144 * 12?")
+    assert math_intent is not None
+    assert math_intent[0] == "calculator"
+    assert "144 * 12" in math_intent[1]["expression"]
+
+    search_intent = agent.classify_autonomous_intent("search for latest developments in small language models")
+    assert search_intent is not None
+    assert search_intent[0] == "web_search"
+    assert "developments in small language models" in search_intent[1]["query"]
+
+    file_intent = agent.classify_autonomous_intent("read config/victor.yaml")
+    assert file_intent is not None
+    assert file_intent[0] == "filesystem"
+    assert file_intent[1]["path"] == "config/victor.yaml"
+
+
+@pytest.mark.asyncio
+async def test_agent_autonomous_chat_routing():
+    agent = VictorAgent(llm=MockLLM("50 * 20 is 1,000."))
+    res = await agent.chat("what is 50 * 20?")
+    assert res["tool_executed"] is not None
+    assert res["tool_executed"]["name"] == "calculator"
+    assert "1,000" in res["content"] or "1000" in res["content"]
+

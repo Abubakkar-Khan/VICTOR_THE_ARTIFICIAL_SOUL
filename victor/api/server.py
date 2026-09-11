@@ -1,6 +1,9 @@
 """FastAPI Server exposing REST and WebSocket endpoints for Victor."""
 
 import asyncio
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -12,8 +15,10 @@ from pydantic import BaseModel
 from victor.core.agent import VictorAgent
 from victor.core.config import load_config
 from victor.core.events import AgentEvent, EventBus
+from victor.models.factory import create_model_provider
+from victor.permissions.manager import PermissionDecision
 
-app = FastAPI(title="Victor — The Artificial Soul API", version="0.1.0")
+app = FastAPI(title="Victor — The Artificial Soul API", version="0.2.0")
 
 # Enable CORS for local dev / frontend
 app.add_middleware(
@@ -35,6 +40,25 @@ if web_dir.exists():
 class ChatRequest(BaseModel):
     message: str
     reset: bool = False
+
+
+class FactRequest(BaseModel):
+    fact: str
+    category: str = "general"
+
+
+class PreferenceRequest(BaseModel):
+    key: str
+    value: str
+
+
+class PermissionResponseRequest(BaseModel):
+    request_id: str
+    decision: str  # allow_once, always_allow, deny
+
+
+class ModelSwitchRequest(BaseModel):
+    model_name: str
 
 
 @app.get("/")
@@ -69,6 +93,8 @@ async def get_status():
         "tools_count": len(agent.registry.list_tools()),
         "personality": agent.config.personality.model_dump(),
         "security": agent.config.security.model_dump(),
+        "facts_count": len(agent.memory.list_facts()),
+        "tasks_count": len(agent.tasks.list_all_tasks()),
     }
 
 
@@ -86,6 +112,111 @@ async def chat_endpoint(req: ChatRequest):
     res = await agent.chat(req.message)
     return res
 
+
+# --- Tasks Subsystem Endpoints ---
+
+@app.get("/api/tasks")
+async def get_tasks():
+    return {
+        "tasks": agent.tasks.list_all_tasks()
+    }
+
+
+# --- Memory Subsystem Endpoints ---
+
+@app.get("/api/memory")
+async def get_memory():
+    return {
+        "facts": agent.memory.list_facts(),
+        "preferences": agent.memory.list_preferences(),
+        "summary": agent.memory.get_context_summary(),
+    }
+
+
+@app.post("/api/memory/fact")
+async def add_fact(req: FactRequest):
+    fact_id = agent.memory.add_fact(req.fact, req.category)
+    return {"status": "created", "id": fact_id, "fact": req.fact}
+
+
+@app.delete("/api/memory/fact/{fact_id}")
+async def delete_fact(fact_id: int):
+    agent.memory.delete_fact(fact_id)
+    return {"status": "deleted", "id": fact_id}
+
+
+@app.post("/api/memory/preference")
+async def set_preference(req: PreferenceRequest):
+    agent.memory.set_preference(req.key, req.value)
+    return {"status": "saved", "key": req.key, "value": req.value}
+
+
+@app.delete("/api/memory/preference/{key}")
+async def delete_preference(key: str):
+    agent.memory.delete_preference(key)
+    return {"status": "deleted", "key": key}
+
+
+# --- Permissions Endpoints ---
+
+@app.get("/api/permissions/pending")
+async def get_pending_permissions():
+    return {
+        "requests": agent.permissions.get_pending_requests()
+    }
+
+
+@app.post("/api/permissions/respond")
+async def respond_permission(req: PermissionResponseRequest):
+    decision_enum = PermissionDecision(req.decision)
+    res = agent.permissions.resolve_request(req.request_id, decision_enum)
+    if not res:
+        return {"status": "not_found", "request_id": req.request_id}
+    return {"status": "resolved", "request": res.to_dict()}
+
+
+# --- Models Endpoints ---
+
+@app.get("/api/models")
+async def get_models():
+    available = []
+    if hasattr(agent.llm, "list_available_models"):
+        try:
+            available = await agent.llm.list_available_models()
+        except Exception:
+            available = []
+    return {
+        "current": agent.config.model.name,
+        "provider": agent.config.model.provider,
+        "available": available,
+    }
+
+
+@app.post("/api/models/switch")
+async def switch_model(req: ModelSwitchRequest):
+    agent.config.model.name = req.model_name
+    agent.llm = create_model_provider(agent.config.model)
+    return {"status": "switched", "model": req.model_name}
+
+
+# --- Desktop Mascot Launch Endpoint ---
+
+@app.post("/api/mascot/launch")
+async def launch_mascot():
+    try:
+        mascot_script = Path(__file__).parent.parent / "desktop" / "mascot.py"
+        DETACHED_PROCESS = 0x00000008
+        subprocess.Popen(
+            [sys.executable, str(mascot_script)],
+            creationflags=DETACHED_PROCESS,
+            close_fds=True,
+        )
+        return {"status": "launched", "message": "Desktop mascot launched successfully."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# --- WebSocket Telemetry & Event Streaming ---
 
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):

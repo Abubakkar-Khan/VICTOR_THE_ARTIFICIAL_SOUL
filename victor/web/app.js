@@ -1,392 +1,233 @@
 /**
- * VICTOR // soulOS - Frontend Orchestration Engine
- * Gamified Gen-Z Retro-Modern UI with Web Audio Synth FX,
- * XP & Level Progression, Achievements, Borderless Chat, and Live Workflow Sync.
+ * VICTOR — THE ARTIFICIAL SOUL // Modern Control Center Orchestration Engine
+ * Complete client implementation with 7 views, integrated animated mascot,
+ * Web Speech API (STT & TTS), real-time hierarchical flow, tasks, and memory.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
   // ---------------------------------------------------------------------------
-  // 1. DOM Elements
+  // 1. Navigation & State
   // ---------------------------------------------------------------------------
-  const chatStream = document.getElementById("chat-stream");
-  const chatInput = document.getElementById("chat-input");
-  const btnSend = document.getElementById("btn-send");
-  const clearChatBtn = document.getElementById("clear-chat-btn");
-  const exportChatBtn = document.getElementById("export-chat-btn");
-  const sparkPromptBtn = document.getElementById("spark-prompt-btn");
-  const statusPill = document.getElementById("status-pill");
-  const sfxToggleBtn = document.getElementById("sfx-toggle-btn");
-  const sfxLabel = document.getElementById("sfx-label");
+  const navItems = document.querySelectorAll(".nav-item");
+  const viewPanels = document.querySelectorAll(".view-panel");
+  const viewTitle = document.getElementById("view-title");
+  const activeModelPill = document.getElementById("active-model-pill");
 
-  // Gamified Player Elements
-  const playerLevel = document.getElementById("player-level");
-  const levelTitle = document.getElementById("level-title");
-  const xpText = document.getElementById("xp-text");
-  const xpBarFill = document.getElementById("xp-bar-fill");
-  const streakCountEl = document.getElementById("streak-count");
-  const achievementToast = document.getElementById("achievement-toast");
-  const achieveTitle = document.getElementById("achieve-title");
+  // Chat Elements
+  const chatFeed = document.getElementById("chat-feed");
+  const userChatInput = document.getElementById("user-chat-input");
+  const btnChatSend = document.getElementById("btn-chat-send");
+  const btnClearChat = document.getElementById("btn-clear-chat");
+  const btnExportChat = document.getElementById("btn-export-chat");
+  const btnVoiceMic = document.getElementById("btn-voice-mic");
+  const btnTtsToggle = document.getElementById("btn-tts-toggle");
+  const ttsLabel = document.getElementById("tts-label");
 
-  // Workflow Graph Elements
-  const workflowBeacon = document.getElementById("workflow-beacon");
-  const wfLatency = document.getElementById("wf-latency");
-  const resetGraphBtn = document.getElementById("reset-graph-btn");
-  const telemetryDrawer = document.getElementById("telemetry-drawer");
-  const closeDrawerBtn = document.getElementById("close-drawer-btn");
-  const drawerNodeName = document.getElementById("drawer-node-name");
-  const drawerNodeStatus = document.getElementById("drawer-node-status");
-  const drawerNodeDuration = document.getElementById("drawer-node-duration");
-  const drawerNodePayload = document.getElementById("drawer-node-payload");
-  const capabilitiesGrid = document.getElementById("capabilities-grid");
+  // Mascot Elements
+  const mascotSvg = document.getElementById("mascot-svg");
+  const mascotStatePill = document.getElementById("mascot-state-pill");
+  const mascotSpeechText = document.getElementById("mascot-speech-text");
+  const btnLaunchDesktopMascot = document.getElementById("btn-launch-desktop-mascot");
+  const btnSettingsLaunchMascot = document.getElementById("btn-settings-launch-mascot");
 
-  // SVG signal wires
-  const wires = {
-    "1-2": document.getElementById("wire-1-2"),
-    "2-3": document.getElementById("wire-2-3"),
-    "3-4": document.getElementById("wire-3-4"),
-    "4-5": document.getElementById("wire-4-5"),
+  // Workflow Elements
+  const workflowTreeNodes = document.getElementById("workflow-tree-nodes");
+  const wfBeaconDot = document.getElementById("wf-beacon-dot");
+  const flowDrawer = document.getElementById("flow-drawer");
+  const btnCloseDrawer = document.getElementById("btn-close-drawer");
+  const drawerTitle = document.getElementById("drawer-title");
+  const drawerStatus = document.getElementById("drawer-status");
+  const drawerPayload = document.getElementById("drawer-payload");
+  const btnResetWorkflow = document.getElementById("btn-reset-workflow");
+
+  // Tasks & Memory Elements
+  const tasksGrid = document.getElementById("tasks-grid");
+  const badgeTasksCount = document.getElementById("badge-tasks-count");
+  const factsList = document.getElementById("facts-list");
+  const preferencesList = document.getElementById("preferences-list");
+  const newFactInput = document.getElementById("new-fact-input");
+  const btnAddFact = document.getElementById("btn-add-fact");
+
+  // Tools & Models Elements
+  const toolsGrid = document.getElementById("tools-grid");
+  const modelsList = document.getElementById("models-list");
+  const modelActiveVal = document.getElementById("model-active-val");
+  const modelProviderVal = document.getElementById("model-provider-val");
+
+  // Settings & Permission Modal Elements
+  const ttsVoiceSelect = document.getElementById("tts-voice-select");
+  const ttsRateRange = document.getElementById("tts-rate-range");
+  const permissionModal = document.getElementById("permission-modal");
+  const permTitle = document.getElementById("perm-title");
+  const permDesc = document.getElementById("perm-desc");
+  const permDetails = document.getElementById("perm-details");
+  const btnPermAllowOnce = document.getElementById("btn-perm-allow-once");
+  const btnPermAlwaysAllow = document.getElementById("btn-perm-always-allow");
+  const btnPermDeny = document.getElementById("btn-perm-deny");
+
+  let socket = null;
+  let isTransmitting = false;
+  let ttsEnabled = localStorage.getItem("victor_tts_enabled") !== "false";
+  let activePermRequestId = null;
+
+  const viewHeadlines = {
+    chat: "Conversation",
+    workflow: "Live Execution Flow",
+    tasks: "Autonomous Tasks",
+    memory: "Persistent Memory",
+    tools: "Capabilities & Tools",
+    models: "Model Architecture",
+    settings: "Settings & Controls",
   };
 
-  // ---------------------------------------------------------------------------
-  // 2. Web Audio API Procedural Synth Sound FX Engine
-  // ---------------------------------------------------------------------------
-  let audioCtx = null;
-  let sfxEnabled = localStorage.getItem("victor_sfx_enabled") !== "false";
+  function switchView(viewName) {
+    navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.view === viewName));
+    viewPanels.forEach((p) => p.classList.toggle("active", p.id === `view-${viewName}`));
+    if (viewTitle) viewTitle.textContent = viewHeadlines[viewName] || "Workspace";
 
-  function initAudioContext() {
-    if (!audioCtx) {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
-      }
+    // Refresh specific view data on switch
+    if (viewName === "tasks") loadTasks();
+    if (viewName === "memory") loadMemory();
+    if (viewName === "tools") loadTools();
+    if (viewName === "models") loadModels();
+  }
+
+  navItems.forEach((btn) => {
+    btn.addEventListener("click", () => switchView(btn.dataset.view));
+  });
+
+  // ---------------------------------------------------------------------------
+  // 2. Animated Mascot State Machine
+  // ---------------------------------------------------------------------------
+  let currentMascotState = "idle";
+
+  function setMascotState(state, speech = "") {
+    currentMascotState = state;
+    if (mascotSvg) {
+      mascotSvg.className = `mascot-svg ${state}`;
     }
-    if (audioCtx && audioCtx.state === "suspended") {
-      audioCtx.resume();
+    if (mascotStatePill) {
+      mascotStatePill.className = `state-pill ${state}`;
+      mascotStatePill.textContent = state.toUpperCase();
+    }
+    if (speech && mascotSpeechText) {
+      mascotSpeechText.textContent = speech.slice(0, 95);
     }
   }
 
-  // Update SFX Button UI
-  function updateSfxButtonUI() {
-    if (sfxLabel) {
-      sfxLabel.textContent = sfxEnabled ? "SFX: ON" : "SFX: OFF";
-    }
-    if (sfxToggleBtn) {
-      if (sfxEnabled) {
-        sfxToggleBtn.classList.add("active");
+  // ---------------------------------------------------------------------------
+  // 3. Voice Support: Speech Recognition (STT) & Speech Synthesis (TTS)
+  // ---------------------------------------------------------------------------
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let isListening = false;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      isListening = true;
+      if (btnVoiceMic) btnVoiceMic.classList.add("listening");
+      setMascotState("listening", "Listening to your voice...");
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        transcript += event.results[i][0].transcript;
+      }
+      if (userChatInput) {
+        userChatInput.value = transcript;
+      }
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      if (btnVoiceMic) btnVoiceMic.classList.remove("listening");
+      if (userChatInput && userChatInput.value.trim()) {
+        sendUserMessage();
       } else {
-        sfxToggleBtn.classList.remove("active");
+        setMascotState("idle", "Standing by.");
       }
+    };
+
+    recognition.onerror = () => {
+      isListening = false;
+      if (btnVoiceMic) btnVoiceMic.classList.remove("listening");
+      setMascotState("idle");
+    };
+  }
+
+  if (btnVoiceMic) {
+    btnVoiceMic.addEventListener("click", () => {
+      if (!recognition) {
+        alert("Web Speech API recognition is not supported in this browser.");
+        return;
+      }
+      if (isListening) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
+    });
+  }
+
+  // TTS Setup
+  function updateTtsButtonUI() {
+    if (ttsLabel) ttsLabel.textContent = ttsEnabled ? "Voice: On" : "Voice: Off";
+    if (btnTtsToggle) btnTtsToggle.classList.toggle("active", ttsEnabled);
+  }
+  updateTtsButtonUI();
+
+  if (btnTtsToggle) {
+    btnTtsToggle.addEventListener("click", () => {
+      ttsEnabled = !ttsEnabled;
+      localStorage.setItem("victor_tts_enabled", ttsEnabled ? "true" : "false");
+      updateTtsButtonUI();
+    });
+  }
+
+  let voices = [];
+  function populateVoices() {
+    if (!window.speechSynthesis || !ttsVoiceSelect) return;
+    voices = window.speechSynthesis.getVoices();
+    ttsVoiceSelect.innerHTML = "";
+    voices.forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      if (v.default || v.name.includes("Google") || v.name.includes("Natural")) {
+        opt.selected = true;
+      }
+      ttsVoiceSelect.appendChild(opt);
+    });
+  }
+
+  if (window.speechSynthesis) {
+    populateVoices();
+    window.speechSynthesis.onvoiceschanged = populateVoices;
+  }
+
+  function speakText(text) {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const cleanText = text.replace(/`{1,3}[\s\S]*?`{1,3}/g, "").replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    if (ttsVoiceSelect && voices[ttsVoiceSelect.value]) {
+      utterance.voice = voices[ttsVoiceSelect.value];
     }
-  }
-  updateSfxButtonUI();
-
-  if (sfxToggleBtn) {
-    sfxToggleBtn.addEventListener("click", () => {
-      sfxEnabled = !sfxEnabled;
-      localStorage.setItem("victor_sfx_enabled", sfxEnabled ? "true" : "false");
-      updateSfxButtonUI();
-      if (sfxEnabled) {
-        playSfx("transmit");
-      }
-    });
-  }
-
-  function playSfx(type) {
-    if (!sfxEnabled) return;
-    try {
-      initAudioContext();
-      if (!audioCtx) return;
-      const now = audioCtx.currentTime;
-
-      if (type === "transmit") {
-        // High-pitch sci-fi blip / transmit chirp (880Hz -> 1320Hz)
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, now);
-        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.07);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.09);
-
-      } else if (type === "tool_start") {
-        // Subtle cyber sweep down (650Hz -> 320Hz)
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(650, now);
-        osc.frequency.exponentialRampToValueAtTime(320, now + 0.12);
-        gain.gain.setValueAtTime(0.09, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.14);
-
-      } else if (type === "tool_done") {
-        // Double cyber confirmation blip
-        [0, 0.07].forEach((delay, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(idx === 0 ? 600 : 920, now + delay);
-          gain.gain.setValueAtTime(0.08, now + delay);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.06);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + delay);
-          osc.stop(now + delay + 0.07);
-        });
-
-      } else if (type === "achieve" || type === "level_up") {
-        // Sparkling 4-tone ascending fanfare (C5, E5, G5, C6)
-        const freqs = [523.25, 659.25, 783.99, 1046.50];
-        freqs.forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-          gain.gain.setValueAtTime(0.12, now + idx * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.18);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + idx * 0.08);
-          osc.stop(now + idx * 0.08 + 0.2);
-        });
-      }
-    } catch (err) {
-      console.warn("Audio synthesis error:", err);
+    if (ttsRateRange) {
+      utterance.rate = parseFloat(ttsRateRange.value) || 1.0;
     }
+    window.speechSynthesis.speak(utterance);
   }
 
   // ---------------------------------------------------------------------------
-  // 3. Gamification: XP, Levels, Streaks & Achievements
-  // ---------------------------------------------------------------------------
-  const LEVEL_TIERS = [
-    { level: 1, title: "SYNAPSE SEED", minXp: 0, maxXp: 150 },
-    { level: 2, title: "NEURAL LINK", minXp: 150, maxXp: 350 },
-    { level: 3, title: "OPERATOR", minXp: 350, maxXp: 650 },
-    { level: 4, title: "CYBER ADEPT", minXp: 650, maxXp: 1050 },
-    { level: 5, title: "SYSTEM ARCHITECT", minXp: 1050, maxXp: 1600 },
-    { level: 6, title: "SOUL SYNCED", minXp: 1600, maxXp: 2400 },
-    { level: 7, title: "TRANSCENDENT", minXp: 2400, maxXp: 999999 },
-  ];
-
-  let currentXp = parseInt(localStorage.getItem("victor_user_xp") || "0", 10);
-  let streakCount = parseInt(localStorage.getItem("victor_streak_count") || "1", 10);
-  let unlockedAchievements = JSON.parse(localStorage.getItem("victor_unlocked_achievements") || "[]");
-
-  function getTierForXp(xp) {
-    for (let i = LEVEL_TIERS.length - 1; i >= 0; i--) {
-      if (xp >= LEVEL_TIERS[i].minXp) {
-        return LEVEL_TIERS[i];
-      }
-    }
-    return LEVEL_TIERS[0];
-  }
-
-  function updatePlayerUI() {
-    const tier = getTierForXp(currentXp);
-    if (playerLevel) playerLevel.textContent = String(tier.level).padStart(2, "0");
-    if (levelTitle) levelTitle.textContent = tier.title;
-
-    const tierRange = tier.maxXp - tier.minXp;
-    const progressInTier = currentXp - tier.minXp;
-    if (xpText) xpText.textContent = `${progressInTier} / ${tierRange} XP`;
-
-    const pct = Math.min(100, Math.max(0, (progressInTier / tierRange) * 100));
-    if (xpBarFill) xpBarFill.style.width = `${pct}%`;
-
-    if (streakCountEl) streakCountEl.textContent = String(streakCount);
-  }
-
-  function addXp(amount) {
-    const oldTier = getTierForXp(currentXp);
-    currentXp += amount;
-    localStorage.setItem("victor_user_xp", currentXp);
-
-    // Floating XP Gain Micro-animation
-    const xpContainer = document.querySelector(".xp-container");
-    if (xpContainer) {
-      const badge = document.createElement("div");
-      badge.className = "xp-gain-badge";
-      badge.textContent = `+${amount} XP`;
-      xpContainer.appendChild(badge);
-      setTimeout(() => badge.remove(), 1200);
-    }
-
-    updatePlayerUI();
-
-    // Check for Level Up
-    const newTier = getTierForXp(currentXp);
-    if (newTier.level > oldTier.level) {
-      playSfx("level_up");
-      triggerAchievement(`CONSCIOUSNESS ELEVATED: LVL ${newTier.level}`);
-    }
-  }
-
-  let toastTimer = null;
-  function triggerAchievement(title) {
-    if (!achievementToast || !achieveTitle) return;
-    achieveTitle.textContent = title;
-    achievementToast.classList.add("show");
-    playSfx("achieve");
-
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      achievementToast.classList.remove("show");
-    }, 3800);
-  }
-
-  function checkAchievement(id, title) {
-    if (unlockedAchievements.includes(id)) return;
-    unlockedAchievements.push(id);
-    localStorage.setItem("victor_unlocked_achievements", JSON.stringify(unlockedAchievements));
-    triggerAchievement(title);
-  }
-
-  function incrementStreak() {
-    streakCount += 1;
-    localStorage.setItem("victor_streak_count", streakCount);
-    if (streakCountEl) streakCountEl.textContent = String(streakCount);
-    if (streakCount === 5) {
-      checkAchievement("streak_5", "FLOW STATE: 5X STREAK");
-    }
-  }
-
-  updatePlayerUI();
-
-  // ---------------------------------------------------------------------------
-  // 4. Creative Sparks & Prompts Generator
-  // ---------------------------------------------------------------------------
-  const SPARK_PROMPTS = [
-    "/calc 144 * 12 + (2 ** 8)",
-    "/search latest advancements in local AI agent memory",
-    "/file config/victor.yaml",
-    "Explain quantum superposition using a cybernetic metaphor.",
-    "What are the core design principles of Nothing OS and neo-brutalism?",
-    "/calc (365 * 24 * 60) / 7",
-    "/search lightweight small language models 2026",
-    "Simulate a brief dialog between a kernel thread and an AI daemon.",
-    "How does Victor use recursive tool loops to synthesize human answers?",
-    "/calc 3.14159265 * (42 ** 2)",
-    "Write a short retro-futuristic haiku about an awakening artificial soul.",
-    "/tools"
-  ];
-
-  if (sparkPromptBtn) {
-    sparkPromptBtn.addEventListener("click", () => {
-      initAudioContext();
-      playSfx("transmit");
-      const randomPrompt = SPARK_PROMPTS[Math.floor(Math.random() * SPARK_PROMPTS.length)];
-      if (chatInput) {
-        chatInput.value = randomPrompt;
-        chatInput.focus();
-      }
-      addXp(15);
-      checkAchievement("spark_plug", "CREATIVE SPARK INJECTED");
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 5. Telemetry Store & Live Interactive Workflow Graph
-  // ---------------------------------------------------------------------------
-  const telemetryStore = {
-    input: { name: "01 // INGESTION", status: "STANDBY", duration: "-", data: "Standing by for user directive." },
-    magi: { name: "02 // COGNITIVE CORE", status: "STANDBY", duration: "-", data: "Decision Matrix idle." },
-    tool: { name: "03 // TOOL HARNESS", status: "STANDBY", duration: "-", data: "No tool currently engaged." },
-    obs: { name: "04 // OBSERVATION BUFFER", status: "STANDBY", duration: "-", data: "Buffer empty." },
-    synth: { name: "05 // RECURSIVE SYNTHESIS", status: "STANDBY", duration: "-", data: "Awaiting observation input." },
-  };
-
-  function resetWorkflowNodes() {
-    const nodeKeys = ["input", "magi", "tool", "obs", "synth"];
-    nodeKeys.forEach((key) => {
-      setCardState(key, "STANDBY", "standby");
-    });
-    Object.values(wires).forEach((wire) => {
-      if (wire) wire.classList.remove("active");
-    });
-    if (workflowBeacon) workflowBeacon.classList.remove("pulsing");
-  }
-
-  function setCardState(nodeKey, statusText, statusClass, previewText = null, rawData = null) {
-    const card = document.getElementById(`wf-node-${nodeKey}`);
-    const statusEl = document.getElementById(`wf-status-${nodeKey}`);
-    const descEl = document.getElementById(`wf-desc-${nodeKey}`);
-
-    if (card && statusEl) {
-      card.className = `pipeline-card ${statusClass === "running" ? "active" : statusClass === "locked" ? "locked" : ""}`;
-      statusEl.className = `p-card-status ${statusClass}`;
-      statusEl.textContent = statusText;
-
-      if (previewText && descEl) {
-        descEl.textContent = previewText;
-      }
-
-      telemetryStore[nodeKey].status = statusText;
-      if (previewText) telemetryStore[nodeKey].data = previewText;
-      if (rawData) telemetryStore[nodeKey].data = rawData;
-    }
-  }
-
-  // Node Inspector Drawer
-  document.querySelectorAll(".pipeline-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      const nodeKey = card.dataset.node;
-      const info = telemetryStore[nodeKey];
-      if (info && telemetryDrawer) {
-        drawerNodeName.textContent = info.name;
-        drawerNodeStatus.textContent = info.status;
-        drawerNodeDuration.textContent = info.duration || "-";
-
-        let displayData = info.data;
-        if (typeof displayData === "object") {
-          displayData = JSON.stringify(displayData, null, 2);
-        }
-        drawerNodePayload.textContent = displayData;
-        telemetryDrawer.classList.add("open");
-        playSfx("transmit");
-      }
-    });
-  });
-
-  if (closeDrawerBtn && telemetryDrawer) {
-    closeDrawerBtn.addEventListener("click", () => {
-      telemetryDrawer.classList.remove("open");
-    });
-  }
-
-  if (resetGraphBtn) {
-    resetGraphBtn.addEventListener("click", () => {
-      resetWorkflowNodes();
-      playSfx("transmit");
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Tab Navigation Switcher
-  // ---------------------------------------------------------------------------
-  document.querySelectorAll(".switch-tab").forEach((tabBtn) => {
-    tabBtn.addEventListener("click", () => {
-      initAudioContext();
-      document.querySelectorAll(".switch-tab").forEach((btn) => btn.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
-
-      tabBtn.classList.add("active");
-      const targetPanelId = `panel-${tabBtn.dataset.tab}`;
-      const targetPanel = document.getElementById(targetPanelId);
-      if (targetPanel) {
-        targetPanel.classList.add("active");
-      }
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // 7. Borderless Chat Rendering & Formatting (Strictly No Borders)
+  // 4. Borderless Chat Presentation
   // ---------------------------------------------------------------------------
   function stripEmojis(str) {
     if (!str) return "";
@@ -405,92 +246,79 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/'/g, "&#039;");
   }
 
-  function formatMarkdownText(str) {
+  function formatMarkdown(str) {
     if (!str) return "";
     let clean = escapeHtml(str);
-    // Multi-line code blocks
-    clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (m, lang, code) => {
-      return `<pre><code>${code.trim()}</code></pre>`;
-    });
-    // Inline code
+    clean = clean.replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, (m, lang, code) => `<pre><code>${code.trim()}</code></pre>`);
     clean = clean.replace(/`([^`]+)`/g, "<code>$1</code>");
-    // Bold text
     clean = clean.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    // Links
     clean = clean.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     return clean;
   }
 
   function appendUserMessage(text) {
     const row = document.createElement("div");
-    row.className = "convo-row user-row";
-    const time = new Date().toTimeString().split(" ")[0];
+    row.className = "chat-row user-row";
+    const time = new Date().toTimeString().split(" ")[0].slice(0, 5);
 
     row.innerHTML = `
-      <div class="convo-avatar">U</div>
-      <div class="convo-content">
-        <div class="convo-header">
-          <span class="convo-sender">User</span>
-          <span class="convo-time">${time}</span>
+      <div class="avatar-capsule">U</div>
+      <div class="speech-content">
+        <div class="speech-header">
+          <span class="speech-author">User</span>
+          <span class="speech-time">${time}</span>
         </div>
-        <div class="convo-text">${escapeHtml(stripEmojis(text))}</div>
+        <div class="speech-body">${escapeHtml(stripEmojis(text))}</div>
       </div>
     `;
 
-    chatStream.appendChild(row);
-    chatStream.scrollTop = chatStream.scrollHeight;
+    chatFeed.appendChild(row);
+    chatFeed.scrollTop = chatFeed.scrollHeight;
   }
 
   function appendVictorMessage(text) {
     const row = document.createElement("div");
-    row.className = "convo-row victor-row";
-    const time = new Date().toTimeString().split(" ")[0];
-    const cleanRaw = stripEmojis(text);
+    row.className = "chat-row victor-row";
+    const time = new Date().toTimeString().split(" ")[0].slice(0, 5);
+    const clean = stripEmojis(text);
 
     row.innerHTML = `
-      <div class="convo-avatar">V</div>
-      <div class="convo-content">
-        <div class="convo-header">
-          <span class="convo-sender">Victor</span>
-          <span class="convo-time">${time}</span>
+      <div class="avatar-capsule">V</div>
+      <div class="speech-content">
+        <div class="speech-header">
+          <span class="speech-author">Victor</span>
+          <span class="speech-time">${time}</span>
         </div>
-        <div class="convo-text">${formatMarkdownText(cleanRaw)}</div>
-        <div class="msg-actions">
-          <button class="micro-btn btn-copy" title="Copy Victor's response">[COPY]</button>
-        </div>
+        <div class="speech-body">${formatMarkdown(clean)}</div>
+        <button class="btn-copy-reply">Copy</button>
       </div>
     `;
 
-    // Copy to clipboard handler
-    const copyBtn = row.querySelector(".btn-copy");
+    const copyBtn = row.querySelector(".btn-copy-reply");
     if (copyBtn) {
       copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(cleanRaw).then(() => {
-          copyBtn.textContent = "[COPIED]";
-          playSfx("transmit");
-          setTimeout(() => {
-            copyBtn.textContent = "[COPY]";
-          }, 1500);
+        navigator.clipboard.writeText(clean).then(() => {
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => (copyBtn.textContent = "Copy"), 1500);
         });
       });
     }
 
-    chatStream.appendChild(row);
-    chatStream.scrollTop = chatStream.scrollHeight;
+    chatFeed.appendChild(row);
+    chatFeed.scrollTop = chatFeed.scrollHeight;
+
+    // Speak response
+    speakText(clean);
   }
 
   // ---------------------------------------------------------------------------
-  // 8. WebSocket Telemetry & Chat Transport
+  // 5. WebSocket & Real-Time Telemetry
   // ---------------------------------------------------------------------------
-  let socket = null;
-  let isTransmitting = false;
-
-  function setTransmitting(transmitting) {
-    isTransmitting = transmitting;
-    if (btnSend) {
-      btnSend.disabled = transmitting;
-      const textSpan = btnSend.querySelector("span");
-      if (textSpan) textSpan.textContent = transmitting ? "SYNCING..." : "SEND";
+  function setTransmitting(active) {
+    isTransmitting = active;
+    if (btnChatSend) {
+      btnChatSend.disabled = active;
+      btnChatSend.querySelector("span").textContent = active ? "Thinking..." : "Send";
     }
   }
 
@@ -501,115 +329,76 @@ document.addEventListener("DOMContentLoaded", () => {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log("[VICTOR // soulOS] WebSocket link established");
-      if (statusPill) {
-        statusPill.className = "status-capsule online";
-        statusPill.querySelector(".status-name").textContent = "ONLINE";
-      }
+      console.log("[Victor] WebSocket connected");
+      setMascotState("idle", "Connected and standing by.");
     };
 
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        handleServerPayload(payload);
+        handleServerMessage(payload);
       } catch (err) {
-        console.error("Payload parse error:", err);
+        console.error("Payload error:", err);
       }
     };
 
     socket.onclose = () => {
-      if (statusPill) {
-        statusPill.className = "status-capsule";
-        statusPill.querySelector(".status-name").textContent = "RECONNECTING";
-      }
       setTimeout(initWebSocket, 2500);
     };
   }
 
-  function handleServerPayload(payload) {
+  function handleServerMessage(payload) {
     if (payload.type === "event") {
       const evt = payload.event;
       const topic = evt.topic;
       const data = evt.data || {};
 
       if (topic === "agent.started") {
-        if (workflowBeacon) workflowBeacon.classList.add("pulsing");
-        if (wires["1-2"]) wires["1-2"].classList.add("active");
-        setCardState("input", "INGESTING", "running", data.user_message || data.command);
-        setCardState("magi", "PLANNING", "running", "Evaluating directives & intent...");
+        setMascotState("listening", "Processing your directive...");
+        if (wfBeaconDot) wfBeaconDot.classList.add("pulsing");
 
-      } else if (topic === "agent.thinking") {
-        const state = data.state || "synthesizing";
-        if (state === "synthesizing") {
-          if (wires["4-5"]) wires["4-5"].classList.add("active");
-          setCardState("synth", "SYNTHESIS", "running", "Formulating natural response stream...");
-        }
+      } else if (topic === "mascot.state_changed") {
+        setMascotState(data.state || "idle", data.message || "");
+
+      } else if (topic === "agent.hierarchical_plan") {
+        renderWorkflowTree(data.plan?.nodes || []);
 
       } else if (topic === "tool.started") {
-        const toolName = data.tool || "capability";
-        if (wires["2-3"]) wires["2-3"].classList.add("active");
-        setCardState("magi", "LOCKED", "locked", `Selected: ${toolName}`);
-        setCardState("tool", "RUNNING", "running", `Executing ${toolName}`, data.parameters);
-        playSfx("tool_start");
+        setMascotState("working", `Executing ${data.tool}...`);
+        updateNodeState(data.tool, "running");
 
       } else if (topic === "tool.completed") {
-        const toolName = data.tool || "capability";
-        const dur = data.duration !== undefined ? `${data.duration}s` : "OK";
-        setCardState("tool", `LOCKED [${dur}]`, "locked", `${toolName} executed successfully`, data.output);
-        telemetryStore.tool.duration = dur;
+        setMascotState("working", `Completed ${data.tool}.`);
+        updateNodeState(data.tool, "completed", data.output);
 
-        if (wires["3-4"]) wires["3-4"].classList.add("active");
-        setCardState("obs", "BUFFERED", "locked", "Observation payload formatted", data.output);
-        playSfx("tool_done");
-        addXp(50);
-
-        // Tool-specific achievements
-        if (toolName === "calculator") {
-          checkAchievement("calc_math", "CALC MATRIX: Deterministic Execution");
-        } else if (toolName === "web_search") {
-          checkAchievement("web_recon", "CYBER RECON: Web Intelligence Gathered");
-        } else if (toolName === "file_read" || toolName === "file_list") {
-          checkAchievement("filesystem", "DATA VAULT: File System Inspection");
-        }
-
-      } else if (topic === "tool.failed") {
-        setCardState("tool", "FAILED", "standby", data.error, data.output);
+      } else if (topic === "agent.thinking") {
+        setMascotState("thinking", "Synthesizing answer...");
 
       } else if (topic === "agent.completed") {
-        const dur = data.duration !== undefined ? `${data.duration}s` : "0.0s";
-        setCardState("synth", `LOCKED [${dur}]`, "locked", "Natural output stream ready");
-        telemetryStore.synth.duration = dur;
-        if (wfLatency) wfLatency.textContent = dur;
-        if (workflowBeacon) workflowBeacon.classList.remove("pulsing");
+        setMascotState("completed", "Task finished.");
+        if (wfBeaconDot) wfBeaconDot.classList.remove("pulsing");
 
-        setTimeout(() => {
-          Object.values(wires).forEach((w) => w && w.classList.remove("active"));
-        }, 1500);
+      } else if (topic === "permission.requested") {
+        promptPermissionModal(data);
       }
 
     } else if (payload.type === "chat_result") {
       appendVictorMessage(payload.data.content);
-      playSfx("transmit");
-      addXp(25);
-      incrementStreak();
-      checkAchievement("first_contact", "FIRST CONTACT: Neural Link Established");
       setTransmitting(false);
+      setMascotState("completed", "Done!");
+      setTimeout(() => setMascotState("idle", "Ready for next directive."), 3000);
+      loadTasks();
     }
   }
 
-  async function sendDirective() {
-    const text = chatInput.value.trim();
+  async function sendUserMessage() {
+    const text = userChatInput.value.trim();
     if (!text || isTransmitting) return;
 
-    initAudioContext();
-    playSfx("transmit");
     appendUserMessage(text);
-    chatInput.value = "";
+    userChatInput.value = "";
     setTransmitting(true);
-
-    // Reset workflow graph for the incoming directive trace
-    resetWorkflowNodes();
-    setCardState("input", "INGESTING", "running", text);
+    setMascotState("thinking", "Analyzing request...");
 
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ message: text }));
@@ -622,50 +411,41 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const data = await res.json();
         appendVictorMessage(data.content);
-        playSfx("transmit");
-        addXp(25);
-        incrementStreak();
-        checkAchievement("first_contact", "FIRST CONTACT: Neural Link Established");
-        setCardState("synth", "LOCKED", "locked", "Natural output stream ready");
       } catch (err) {
-        appendVictorMessage(`[COMMUNICATION ERROR]: ${err}`);
+        appendVictorMessage(`Communication error: ${err}`);
       } finally {
         setTransmitting(false);
+        setMascotState("idle");
       }
     }
   }
 
-  // Send bindings
-  if (btnSend) btnSend.addEventListener("click", sendDirective);
-
-  if (chatInput) {
-    chatInput.addEventListener("keydown", (e) => {
+  if (btnChatSend) btnChatSend.addEventListener("click", sendUserMessage);
+  if (userChatInput) {
+    userChatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        sendDirective();
+        sendUserMessage();
       }
     });
   }
 
-  // Quick Action Capsules
-  document.querySelectorAll(".quick-chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const cmd = btn.dataset.cmd;
-      if (cmd && chatInput) {
-        chatInput.value = cmd;
-        sendDirective();
+  // Suggestion Chips
+  document.querySelectorAll(".chip-btn").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const q = chip.dataset.query;
+      if (q && userChatInput) {
+        userChatInput.value = q;
+        sendUserMessage();
       }
     });
   });
 
-  // Reset Conversation
-  if (clearChatBtn) {
-    clearChatBtn.addEventListener("click", () => {
-      initAudioContext();
-      playSfx("transmit");
-      chatStream.innerHTML = "";
-      appendVictorMessage("Memory feed reset. Victor is ready for new directives.");
-      resetWorkflowNodes();
+  // Clear & Export Chat
+  if (btnClearChat) {
+    btnClearChat.addEventListener("click", () => {
+      chatFeed.innerHTML = "";
+      appendVictorMessage("Conversation cleared. How can I help you?");
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -674,103 +454,352 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Export Conversation to Markdown
-  if (exportChatBtn) {
-    exportChatBtn.addEventListener("click", () => {
-      initAudioContext();
-      playSfx("transmit");
-
-      const rows = chatStream.querySelectorAll(".convo-row");
-      const dateStr = new Date().toISOString();
-      const currentTier = getTierForXp(currentXp);
-
-      let markdown = `# VICTOR // soulOS CONVERSATION EXPORT\n`;
-      markdown += `Generated: ${dateStr}\n`;
-      markdown += `Operator Level: LVL ${currentTier.level} [${currentTier.title}] (${currentXp} XP)\n`;
-      markdown += `Streak: ${streakCount} cycles\n\n---\n\n`;
-
-      rows.forEach((row) => {
-        const isUser = row.classList.contains("user-row");
-        const sender = isUser ? "User" : "Victor";
-        const time = row.querySelector(".convo-time")?.textContent || "";
-        const text = row.querySelector(".convo-text")?.innerText || "";
-        markdown += `### ${sender} (${time})\n\n${text}\n\n`;
+  if (btnExportChat) {
+    btnExportChat.addEventListener("click", () => {
+      const rows = chatFeed.querySelectorAll(".chat-row");
+      let md = `# Victor — Conversation Export\nDate: ${new Date().toISOString()}\n\n`;
+      rows.forEach((r) => {
+        const isUser = r.classList.contains("user-row");
+        const author = isUser ? "User" : "Victor";
+        const body = r.querySelector(".speech-body")?.innerText || "";
+        md += `### ${author}\n${body}\n\n`;
       });
-
-      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+      const blob = new Blob([md], { type: "text/markdown" });
       const a = document.createElement("a");
-      a.href = url;
+      a.href = URL.createObjectURL(blob);
       a.download = `victor-chat-${Date.now()}.md`;
-      document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      checkAchievement("data_exporter", "DATA PACKET ARCHIVED");
     });
   }
 
   // ---------------------------------------------------------------------------
-  // 9. Load Capabilities & System Status
+  // 6. Workflow Tree Renderer
   // ---------------------------------------------------------------------------
-  async function loadStatus() {
-    try {
-      const res = await fetch("/api/status");
-      if (res.ok) {
-        const data = await res.json();
-        if (statusPill) {
-          if (data.status === "online") {
-            statusPill.className = "status-capsule online";
-            statusPill.querySelector(".status-name").textContent = "ONLINE";
-          } else {
-            statusPill.className = "status-capsule";
-            statusPill.querySelector(".status-name").textContent = "OFFLINE";
-          }
+  let currentTreeNodes = [];
+
+  function renderWorkflowTree(nodes) {
+    if (!workflowTreeNodes) return;
+    currentTreeNodes = nodes;
+    workflowTreeNodes.innerHTML = "";
+
+    nodes.forEach((node) => {
+      const card = document.createElement("div");
+      card.className = `tree-card ${node.status}`;
+      card.dataset.nodeId = node.id;
+
+      card.innerHTML = `
+        <div class="card-node-info">
+          <span class="node-label">${escapeHtml(node.label)}</span>
+          <span class="node-detail">${escapeHtml(node.detail || "")}</span>
+        </div>
+        <span class="node-status-pill ${node.status}">${node.status}</span>
+      `;
+
+      card.addEventListener("click", () => {
+        if (drawerTitle) drawerTitle.textContent = node.label;
+        if (drawerStatus) drawerStatus.textContent = node.status.toUpperCase();
+        if (drawerPayload) drawerPayload.textContent = JSON.stringify(node, null, 2);
+        if (flowDrawer) flowDrawer.classList.add("open");
+      });
+
+      workflowTreeNodes.appendChild(card);
+    });
+  }
+
+  function updateNodeState(toolName, status, output = null) {
+    document.querySelectorAll(".tree-card").forEach((card) => {
+      if (card.innerText.toLowerCase().includes(toolName.toLowerCase())) {
+        card.className = `tree-card ${status}`;
+        const pill = card.querySelector(".node-status-pill");
+        if (pill) {
+          pill.className = `node-status-pill ${status}`;
+          pill.textContent = status;
         }
       }
+    });
+  }
+
+  if (btnCloseDrawer && flowDrawer) {
+    btnCloseDrawer.addEventListener("click", () => flowDrawer.classList.remove("open"));
+  }
+
+  if (btnResetWorkflow && workflowTreeNodes) {
+    btnResetWorkflow.addEventListener("click", () => {
+      workflowTreeNodes.innerHTML = "<p style='color:#64748b;'>Awaiting task execution plan...</p>";
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7. Tasks Engine View
+  // ---------------------------------------------------------------------------
+  async function loadTasks() {
+    if (!tasksGrid) return;
+    try {
+      const res = await fetch("/api/tasks");
+      if (res.ok) {
+        const data = await res.json();
+        renderTasks(data.tasks || []);
+      }
     } catch (e) {
-      console.warn("Status check error:", e);
+      console.warn("Failed to load tasks:", e);
     }
   }
 
+  function renderTasks(tasks) {
+    if (!tasksGrid) return;
+    tasksGrid.innerHTML = "";
+    if (badgeTasksCount) badgeTasksCount.textContent = tasks.length;
+
+    if (tasks.length === 0) {
+      tasksGrid.innerHTML = `<div class="card-box" style="grid-column: 1/-1;"><p class="card-desc">No tasks executed yet. Ask Victor to perform an autonomous multi-step workflow!</p></div>`;
+      return;
+    }
+
+    tasks.forEach((t) => {
+      const card = document.createElement("div");
+      card.className = "task-card";
+
+      const stepsHtml = (t.steps || []).map((s) => `
+        <div class="task-step-item ${s.status}">
+          <span class="step-indicator"></span>
+          <span>${escapeHtml(s.name)}</span>
+        </div>
+      `).join("");
+
+      card.innerHTML = `
+        <div class="task-card-header">
+          <span class="task-goal">${escapeHtml(t.goal)}</span>
+          <span class="task-status-tag ${t.status}">${t.status}</span>
+        </div>
+        <div class="task-steps-list">
+          ${stepsHtml || '<span style="color:#64748b;font-size:11px;">Single-step execution</span>'}
+        </div>
+        <div class="task-meta-footer">
+          Duration: ${t.duration || 0}s &bull; ID: ${t.id}
+        </div>
+      `;
+      tasksGrid.appendChild(card);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. Memory View
+  // ---------------------------------------------------------------------------
+  async function loadMemory() {
+    try {
+      const res = await fetch("/api/memory");
+      if (res.ok) {
+        const data = await res.json();
+        renderMemoryFacts(data.facts || []);
+        renderMemoryPreferences(data.preferences || {});
+      }
+    } catch (e) {
+      console.warn("Memory load fail:", e);
+    }
+  }
+
+  function renderMemoryFacts(facts) {
+    if (!factsList) return;
+    factsList.innerHTML = "";
+    if (facts.length === 0) {
+      factsList.innerHTML = `<p class="card-desc">No facts remembered yet.</p>`;
+      return;
+    }
+
+    facts.forEach((f) => {
+      const item = document.createElement("div");
+      item.className = "memory-item-pill";
+      item.innerHTML = `
+        <span>${escapeHtml(f.fact)}</span>
+        <button class="btn-delete-mem" data-id="${f.id}">Forget</button>
+      `;
+      item.querySelector(".btn-delete-mem").addEventListener("click", async () => {
+        await fetch(`/api/memory/fact/${f.id}`, { method: "DELETE" });
+        loadMemory();
+      });
+      factsList.appendChild(item);
+    });
+  }
+
+  function renderMemoryPreferences(prefs) {
+    if (!preferencesList) return;
+    preferencesList.innerHTML = "";
+    const keys = Object.keys(prefs);
+    if (keys.length === 0) {
+      preferencesList.innerHTML = `<p class="card-desc">No preferences configured.</p>`;
+      return;
+    }
+
+    keys.forEach((k) => {
+      const item = document.createElement("div");
+      item.className = "memory-item-pill";
+      item.innerHTML = `
+        <span><strong>${escapeHtml(k)}:</strong> ${escapeHtml(prefs[k])}</span>
+        <button class="btn-delete-mem" data-key="${k}">Reset</button>
+      `;
+      item.querySelector(".btn-delete-mem").addEventListener("click", async () => {
+        await fetch(`/api/memory/preference/${k}`, { method: "DELETE" });
+        loadMemory();
+      });
+      preferencesList.appendChild(item);
+    });
+  }
+
+  if (btnAddFact && newFactInput) {
+    btnAddFact.addEventListener("click", async () => {
+      const val = newFactInput.value.trim();
+      if (!val) return;
+      await fetch("/api/memory/fact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fact: val }),
+      });
+      newFactInput.value = "";
+      loadMemory();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 9. Tools View
+  // ---------------------------------------------------------------------------
   async function loadTools() {
+    if (!toolsGrid) return;
     try {
       const res = await fetch("/api/tools");
       if (res.ok) {
         const data = await res.json();
-        renderCapabilities(data.tools || []);
+        renderTools(data.tools || []);
       }
     } catch (e) {
-      console.warn("Tools load error:", e);
+      console.warn("Tools load fail:", e);
     }
   }
 
-  function renderCapabilities(tools) {
-    if (!capabilitiesGrid) return;
-    capabilitiesGrid.innerHTML = "";
-    tools.forEach((tool) => {
+  function renderTools(tools) {
+    if (!toolsGrid) return;
+    toolsGrid.innerHTML = "";
+    tools.forEach((t) => {
       const card = document.createElement("div");
-      card.className = "cap-card";
-      const shortcut = tool.slash_command
-        ? `<div class="cap-shortcut">DIRECTIVE: ${tool.slash_command}</div>`
-        : "";
+      card.className = "tool-card";
       card.innerHTML = `
-        <div class="cap-head">
-          <span class="cap-name">${tool.name.toUpperCase()}</span>
-          <span class="cap-badge ${tool.permission}">[${tool.permission}]</span>
+        <div class="tool-header">
+          <span class="tool-name">${escapeHtml(t.name.toUpperCase())}</span>
+          <span class="tool-perm ${t.permission}">${t.permission}</span>
         </div>
-        <div class="cap-desc">${escapeHtml(tool.description)}</div>
-        ${shortcut}
+        <div class="tool-desc">${escapeHtml(t.description)}</div>
       `;
-      capabilitiesGrid.appendChild(card);
+      toolsGrid.appendChild(card);
     });
   }
 
   // ---------------------------------------------------------------------------
-  // 10. Initialization
+  // 10. Models View
   // ---------------------------------------------------------------------------
-  loadStatus();
-  loadTools();
+  async function loadModels() {
+    try {
+      const res = await fetch("/api/models");
+      if (res.ok) {
+        const data = await res.json();
+        if (modelActiveVal) modelActiveVal.textContent = data.current;
+        if (modelProviderVal) modelProviderVal.textContent = data.provider.toUpperCase();
+        renderModelsList(data.available || [], data.current);
+      }
+    } catch (e) {
+      console.warn("Models load fail:", e);
+    }
+  }
+
+  function renderModelsList(models, current) {
+    if (!modelsList) return;
+    modelsList.innerHTML = "";
+    models.forEach((m) => {
+      const item = document.createElement("div");
+      item.className = "model-opt-item";
+      const isCurrent = m === current;
+      item.innerHTML = `
+        <span><strong>${escapeHtml(m)}</strong></span>
+        <button class="btn-secondary-sm" ${isCurrent ? "disabled" : ""}>
+          ${isCurrent ? "Active" : "Switch"}
+        </button>
+      `;
+      if (!isCurrent) {
+        item.querySelector("button").addEventListener("click", async () => {
+          await fetch("/api/models/switch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model_name: m }),
+          });
+          loadModels();
+        });
+      }
+      modelsList.appendChild(item);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // 11. Permission Prompt Modal
+  // ---------------------------------------------------------------------------
+  function promptPermissionModal(req) {
+    activePermRequestId = req.id;
+    if (permTitle) permTitle.textContent = `Victor wants to execute: ${req.action}`;
+    if (permDesc) permDesc.textContent = `Action targets: ${req.target}`;
+    if (permDetails) permDetails.textContent = JSON.stringify(req.details, null, 2);
+    if (permissionModal) permissionModal.classList.add("show");
+    setMascotState("waiting", "Needs your permission to continue.");
+  }
+
+  async function resolvePermission(decision) {
+    if (!activePermRequestId) return;
+    await fetch("/api/permissions/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_id: activePermRequestId, decision }),
+    });
+    if (permissionModal) permissionModal.classList.remove("show");
+    activePermRequestId = null;
+    setMascotState("working");
+  }
+
+  if (btnPermAllowOnce) btnPermAllowOnce.addEventListener("click", () => resolvePermission("allow_once"));
+  if (btnPermAlwaysAllow) btnPermAlwaysAllow.addEventListener("click", () => resolvePermission("always_allow"));
+  if (btnPermDeny) btnPermDeny.addEventListener("click", () => resolvePermission("deny"));
+
+  // ---------------------------------------------------------------------------
+  // 12. Desktop Mascot Launcher
+  // ---------------------------------------------------------------------------
+  async function launchDesktopMascot() {
+    try {
+      const res = await fetch("/api/mascot/launch", { method: "POST" });
+      const data = await res.json();
+      if (data.status === "launched") {
+        alert("Desktop mascot launched! Look at your desktop.");
+      } else {
+        alert(`Launch status: ${data.message}`);
+      }
+    } catch (e) {
+      alert(`Could not launch desktop mascot: ${e}`);
+    }
+  }
+
+  if (btnLaunchDesktopMascot) btnLaunchDesktopMascot.addEventListener("click", launchDesktopMascot);
+  if (btnSettingsLaunchMascot) btnSettingsLaunchMascot.addEventListener("click", launchDesktopMascot);
+
+  // ---------------------------------------------------------------------------
+  // Initial Status & Link
+  // ---------------------------------------------------------------------------
+  async function loadInitialStatus() {
+    try {
+      const res = await fetch("/api/status");
+      if (res.ok) {
+        const data = await res.json();
+        if (activeModelPill) activeModelPill.textContent = (data.model || "QWEN 1.5B").toUpperCase();
+        if (badgeTasksCount) badgeTasksCount.textContent = data.tasks_count || 0;
+      }
+    } catch (e) {
+      console.warn("Status offline:", e);
+    }
+  }
+
+  loadInitialStatus();
   initWebSocket();
 });

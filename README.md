@@ -1,52 +1,52 @@
 # VICTOR // THE ARTIFICIAL SOUL
 
-> *"A small artificial mind with a world of tools."*
+> *"A small artificial mind that lives on your computer with a world of tools."*
 
-Victor is a **local-first, modular AI agent harness** engineered to feel like a small, curious artificial entity living inside the user's workstation. 
+Victor is a **local-first AI desktop companion and autonomous agent harness** engineered to feel like a living, observant intelligence on your machine. 
 
-Victor operates with a decoupled cognitive architecture: the reasoning model serves as the decision layer, while the harness provides real-world capabilities through standardized tools, short- and long-term memory, real-time observability, and an independent personality engine.
+Victor couples a decoupled cognitive architecture (local small models like Qwen or remote cloud providers) with a real-world tool harness, persistent memory, task automation, permission-aware computer control, and a cute desktop mascot companion.
 
 ---
 
 ## Table of Contents
 
-1. [Product Vision & Philosophy](#1-product-vision--philosophy)
-2. [Design Principles](#2-design-principles)
+1. [Product Vision & Core Experience](#1-product-vision--core-experience)
+2. [Key Capabilities](#2-key-capabilities)
 3. [System Architecture](#3-system-architecture)
-4. [Execution Flow & ReAct Loop](#4-execution-flow--react-loop)
-5. [Progressive Version Roadmap](#5-progressive-version-roadmap)
-6. [Core Features in v0.1](#6-core-features-in-v01)
-7. [Standardized Tool Harness](#7-standardized-tool-harness)
-8. [Security & Permission Tiers](#8-security--permission-tiers)
-9. [Installation & Setup](#9-installation--setup)
-10. [Usage Guide](#10-usage-guide)
-    - [Retro-Cyber Web Command Center](#retro-cyber-web-command-center)
-    - [Terminal Interactive CLI](#terminal-interactive-cli)
-    - [Slash Commands Reference](#slash-commands-reference)
-11. [Configuration Reference](#11-configuration-reference)
-12. [Testing & Verification](#12-testing--verification)
-13. [Project Directory Layout](#13-project-directory-layout)
-14. [Contributing & License](#14-contributing--license)
+4. [The 7-View Control Center](#4-the-7-view-control-center)
+5. [The Desktop Mascot Companion](#5-the-desktop-mascot-companion)
+6. [Autonomous Multi-Step Task Engine](#6-autonomous-multi-step-task-engine)
+7. [Persistent Memory System](#7-persistent-memory-system)
+8. [Full Standardized Tool Suite](#8-full-standardized-tool-suite)
+9. [Permission & Safety Architecture](#9-permission--safety-architecture)
+10. [Voice Input & Speech Output](#10-voice-input--speech-output)
+11. [Installation & Setup](#11-installation--setup)
+12. [Quickstart Guide](#12-quickstart-guide)
+13. [Configuration Reference](#13-configuration-reference)
+14. [Testing & Verification](#14-testing--verification)
+15. [Project Directory Layout](#15-project-directory-layout)
+16. [License](#16-license)
 
 ---
 
-## 1. Product Vision & Philosophy
+## 1. Product Vision & Core Experience
 
-Victor is designed around character and utility rather than pure API chaining:
-- **Character Independent of Model**: Changing the underlying LLM does not destroy Victor's personality, curiosity, or memory.
-- **Hands and Ears**: An artificial mind is only as useful as its interaction with the environment. Victor couples language models with a safe, extensible tool harness.
-- **Observable by Default**: Every thought step, tool invocation, duration, and output is visible in real-time through event subscriptions.
+Victor is built on three core pillars:
+- **Character Independent of Model**: Changing the underlying LLM does not erase Victor's personality, learned facts, or memory.
+- **Hands, Eyes, and Voice**: An artificial mind is only as useful as its ability to perceive and act. Victor can search YouTube, inspect and control your computer (mouse, click, scroll, active window), open desktop apps, fetch web pages, read files, and trigger toasts.
+- **Observable by Default**: Every thought step, tool invocation, duration, and output is rendered live through hierarchical workflow trees and event streams.
 
 ---
 
-## 2. Design Principles
+## 2. Key Capabilities
 
-- **Local First**: Prioritizes local inference (via Ollama / llama.cpp), local memory, and local filesystem access.
-- **Modular**: Model providers, tools, memory stores, and interfaces are isolated components adhering to strict contracts.
-- **Extensible**: Adding a new capability requires creating a tool class and registering it, without modifying the agent core.
-- **Model Agnostic**: Compatible with local small models (Qwen 1.5B/2B/3B) and remote endpoints (OpenAI, Groq, OpenRouter).
-- **Safe by Default**: Risky actions (such as shell execution or external file mutation) require explicit permission.
-- **No Fluff / Zero Emojis**: Clean, technical, retro-cyber terminal presentation with concise, recursively synthesized responses.
+- **Autonomous Intent Routing**: Express requests naturally (*"Search YouTube for compiler tutorials"*, *"Open Chrome"*, *"Remember that I prefer dark mode"*, *"Click the top left corner"*). Victor autonomously identifies intents and routes them to the right tools without requiring slash commands.
+- **Desktop Mascot Companion**: A standalone, transparent, borderless, always-on-top desktop overlay with expressive animated states (idle, listening, thinking, working, completed, error), live speech bubbles, and drag-and-drop repositioning.
+- **Full-Bleed Modern Control Center**: Modern, lively, minimal interface (Linear x Raycast x Vercel design language) running edge-to-edge (100vw x 100vh) with **strictly zero emojis**.
+- **Autonomous Task Engine**: Create, monitor, pause, and inspect multi-step tasks with persistent cards, sub-step progress tracking, and execution durations.
+- **SQLite Persistent Memory**: Automatic storage and retrieval of user preferences, learned facts, conversation history, and task memories.
+- **Permission-Aware Computer Control**: Native Windows mouse movement, left/right clicks, double clicks, scrolling, active window title queries, and screen resolution diagnostics.
+- **Web Speech API**: Integrated voice microphone input (STT) and voice speech synthesis (TTS) toggle directly in the UI.
 
 ---
 
@@ -54,187 +54,199 @@ Victor is designed around character and utility rather than pure API chaining:
 
 ```mermaid
 graph TD
-    subgraph USER_INTERFACES["User Interfaces"]
+    subgraph SURFACES["User Interfaces"]
+        MASCOT["Desktop Mascot Overlay (victor/desktop/mascot.py)"]
+        WEB["Control Center (victor/web/)"]
         CLI["Terminal CLI (victor/cli.py)"]
-        WEB["Retro-Cyber Web UI (victor/web/)"]
-        API["FastAPI REST & WebSockets (victor/api/)"]
+        API["FastAPI REST & WebSockets (victor/api/server.py)"]
     end
 
-    subgraph VICTOR_CORE["Victor Core"]
-        AGENT["VictorAgent (victor/core/agent.py)"]
-        PERSONA["PersonalityEngine (victor/core/personality.py)"]
+    subgraph CORE["Victor Agent Core (victor/core/agent.py)"]
+        AGENT["VictorAgent Coordinator"]
+        INTENT["Autonomous Intent Router"]
         EVENTS["EventBus (victor/core/events.py)"]
-        CONFIG["VictorConfig (config/victor.yaml)"]
+        PERSONA["PersonalityEngine (victor/core/personality.py)"]
     end
 
-    subgraph MODEL_LAYER["Model Layer (victor/models/)"]
-        BASE_LLM["BaseLLM Abstraction"]
-        OLLAMA["OllamaProvider (qwen2:1.5b / local)"]
-        REMOTE["RemoteOpenAIProvider (cloud / api)"]
+    subgraph STATE_SUBSYSTEMS["State & Memory Subsystems"]
+        TASKS["TaskManager (victor/tasks/manager.py)"]
+        MEMORY["MemoryStore (victor/memory/store.py - SQLite)"]
+        PERM["PermissionManager (victor/permissions/manager.py)"]
     end
 
-    subgraph TOOL_HARNESS["Tool Harness (victor/tools/)"]
+    subgraph TOOL_SUITE["Standard Tool Harness (victor/tools/)"]
         REGISTRY["ToolRegistry & Permission Gating"]
-        CALC["CalculatorTool [SAFE]"]
-        SEARCH["WebSearchTool [SAFE]"]
-        BROWSER["BrowserTool [CONTROLLED]"]
-        FILE["FilesystemTool [CONTROLLED]"]
-        SHELL["ShellTool [DANGEROUS]"]
+        YOUTUBE["YouTube Search Tool [SAFE]"]
+        WEB_SEARCH["Web Search Tool [SAFE]"]
+        BROWSER["Browser Reader Tool [CONTROLLED]"]
+        APPS["Applications Tool [SAFE]"]
+        COMPUTER["Computer Control Tool [CONTROLLED]"]
+        NOTIFS["Notifications Tool [SAFE]"]
+        CALC["Calculator Tool [SAFE]"]
+        FILESYSTEM["Filesystem Tool [CONTROLLED]"]
+        SHELL["Shell Tool [DANGEROUS]"]
     end
 
-    CLI --> AGENT
+    subgraph MODELS["Model Providers (victor/models/)"]
+        OLLAMA["Local Ollama Provider (qwen2:1.5b)"]
+        REMOTE["Remote OpenAI / Cloud Provider"]
+    end
+
     WEB --> API
+    MASCOT --> API
+    CLI --> AGENT
     API --> AGENT
-    AGENT --> PERSONA
+    AGENT --> INTENT
     AGENT --> EVENTS
-    AGENT --> CONFIG
-    AGENT --> BASE_LLM
-    BASE_LLM --> OLLAMA
-    BASE_LLM --> REMOTE
+    AGENT --> PERSONA
+    AGENT --> TASKS
+    AGENT --> MEMORY
+    AGENT --> PERM
     AGENT --> REGISTRY
-    REGISTRY --> CALC
-    REGISTRY --> SEARCH
+    AGENT --> MODELS
+    REGISTRY --> YOUTUBE
+    REGISTRY --> WEB_SEARCH
     REGISTRY --> BROWSER
-    REGISTRY --> FILE
+    REGISTRY --> APPS
+    REGISTRY --> COMPUTER
+    REGISTRY --> NOTIFS
+    REGISTRY --> CALC
+    REGISTRY --> FILESYSTEM
     REGISTRY --> SHELL
 ```
 
 ---
 
-## 4. Execution Flow & ReAct Loop
+## 4. The 7-View Control Center
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User / Client
-    participant Agent as VictorAgent
-    participant LLM as ModelProvider (Qwen)
-    participant Tools as ToolRegistry
-    participant Bus as EventBus
+The web dashboard is organized into 7 distinct views accessible via the minimal sidebar:
 
-    User->>Agent: Input prompt / Slash command
-    Agent->>Bus: emit("agent.started")
-    
-    alt Direct Slash Command (e.g. /calc, /search, /file)
-        Agent->>Tools: Execute requested tool directly
-        Tools-->>Agent: ToolResult (success, data, duration)
-        Agent->>Agent: format_tool_display()
-        Agent->>User: Formatted clean terminal output
-    else Conversational Planning & Tool Invocation
-        Agent->>Bus: emit("agent.thinking", state="planning")
-        Agent->>LLM: Generate plan with system persona & tool schemas
-        LLM-->>Agent: Tool call JSON or Direct response
-        
-        opt Tool Call Detected
-            Agent->>Bus: emit("tool.started", tool, params)
-            Agent->>Tools: execute_tool(name, params)
-            Tools-->>Agent: ToolResult
-            Agent->>Bus: emit("tool.completed", duration, output)
-            Agent->>Bus: emit("agent.thinking", state="synthesizing")
-            Agent->>LLM: Recursive synthesis prompt (Observation + Persona)
-            LLM-->>Agent: Short synthesized answer (No emojis)
-        end
-        
-        Agent->>Agent: strip_emojis()
-        Agent->>Bus: emit("agent.completed")
-        Agent->>User: Concise Victor response
-    end
+| View | Purpose | Features |
+| :--- | :--- | :--- |
+| **Chat** | Primary conversational stream | Live thoughts, mascot state reactions, tool trace chips, synthesized recursive answers, suggestion chips, voice input/output. |
+| **Workflow** | Live execution graph | Real-time hierarchical DAG tree showing User Intent -> Intent Classifier -> Tool Execution -> Synthesis with live status pulse animations. |
+| **Tasks** | Autonomous multi-step engine | Persistent task cards, sub-step check-lists, progress bars, pause/resume/delete actions, and duration timers. |
+| **Memory** | Knowledge & preferences store | Add and view persistent facts, learned user preferences (e.g. video duration, theme), and task memory. |
+| **Tools** | Standard capability harness | Live registry of all 9 tools with parameter schemas, execution counts, permission levels, and direct run modals. |
+| **Models** | Cognitive model switcher | Local Ollama vs Cloud provider selection, temperature and token controls, RAM diagnostics. |
+| **Settings** | Harness & system configuration | Personality traits, security flags (`allow_shell`, root directories), companion launch shortcut. |
+
+---
+
+## 5. The Desktop Mascot Companion
+
+Victor features a standalone desktop companion window built with native Python `tkinter`:
+
+- **Transparent & Borderless**: Blends seamlessly onto your desktop background without harsh window frames or titlebars.
+- **Always-on-Top**: Stays discreetly above windows while you work.
+- **Draggable**: Click and drag Victor anywhere across multi-monitor setups.
+- **Living Mascot States**:
+  - `idle`: Gentle breathing pulse and periodic blinking.
+  - `listening`: Alert glowing eyes and listening rings.
+  - `thinking`: Rotating orbit halo.
+  - `working`: Rotating mechanical gear animation.
+  - `completed`: Upward cheer bounce and emerald pulse.
+  - `error`: Warning sweat drop indicator.
+- **Interactive Speech Bubbles**: Renders thoughts, status updates, and speech directly on your screen.
+- **Double-Click Shortcut**: Double-clicking the mascot brings up the full Control Center in your default browser.
+
+Launch the mascot standalone:
+```bash
+python -m victor.desktop.mascot
 ```
+Or launch it from the web interface under **Settings -> Launch Desktop Companion**.
 
 ---
 
-## 5. Progressive Version Roadmap
+## 6. Autonomous Multi-Step Task Engine
 
-The development of Victor progresses from simple harness foundations to multi-modal autonomy:
-
-| Version | Title | Core Focus | Status |
-| :--- | :--- | :--- | :--- |
-| **v0.1** | **The Harness & Brain** | Modular tool harness, Ollama/Remote LLM layer, safe tool suite, independent personality engine, interactive CLI, retro-cyber amber Web UI. | **Completed** |
-| **v0.2** | **The Live Nervous System** | Full event bus with WebSocket pub/sub, real-time live DAG execution graph (React Flow), node status animations, and input/output inspectors. | *Up Next* |
-| **v0.3** | **The Memory & Recall** | SQLite episodic conversation persistence, user-curated long-term memory, semantic embeddings / vector RAG, `/remember` & `/forget` commands. | *Planned* |
-| **v0.4** | **The Voice (Ears & Speech)** | Local Whisper STT (push-to-talk & continuous listening), local Piper/Kokoro TTS, emotional voice modulation, audio waveforms. | *Planned* |
-| **v0.5** | **Autonomous Mind & Safety** | Autonomous multi-step planning, tool chaining, self-correction, dynamic model switcher, and interactive permission confirmation modals. | *Planned* |
-
----
-
-## 6. Core Features in v0.1
-
-- **Standardized Tool Harness**: Universal `BaseTool` contract with JSON schema parameter validation, execution timing, and structured outputs.
-- **Multi-Provider Model Layer**: Pluggable `BaseLLM` interface supporting native `OllamaProvider` (auto-detects Qwen models with RAM diagnostics) and `RemoteOpenAIProvider`.
-- **Zero-Emoji Retro-Cyber Terminal UI**:
-  - Pure terminal black (`#060608`) with amber/orange phosphor accents (`#ff8800`).
-  - No gradients; razor-sharp 1px borders and subtle CRT glow.
-  - All emojis stripped at the core and replaced with technical brackets (`[SYS.01]`, `[ONLINE]`, `[TOOLS]`, `[EXEC ⏎]`).
-- **Concise Recursive Tool Synthesis**:
-  - Mathematical evaluation: `> CALC: 144 * 12 = 1728`
-  - Web search indexing: `> SEARCH // "query" (3 hits)` with clean URL previews.
-  - Safe file inspector: `> FILE // config/victor.yaml (28 lines)`
-  - ReAct observation synthesis: short, punchy 1-to-3 sentence answers without raw JSON dumps.
-- **Dual Interface Delivery**:
-  - **FastAPI Web Server** with real-time WebSockets on port `8000`.
-  - **Interactive Terminal CLI** with colored REPL and command completion.
-
----
-
-## 7. Standardized Tool Harness
-
-Every tool implements the standard contract:
+Victor includes an autonomous multi-step execution engine for handling complex workflows:
 
 ```python
-class BaseTool(ABC):
-    name: str
-    description: str
-    parameters: Dict[str, Any]  # JSON Schema
-    permission: PermissionLevel  # SAFE | CONTROLLED | DANGEROUS
-    slash_command: Optional[str]
-    
-    async def run(self, **kwargs) -> Any: ...
-    async def execute(self, **kwargs) -> ToolResult: ...
+task = task_manager.create_task(
+    title="Research Compiler Passes",
+    description="Automated research workflow across web search, browser extraction, and local notes.",
+    steps=[
+        "Search academic sources for LLVM pass optimizations",
+        "Extract key techniques from documentation",
+        "Generate structured summary and save to task memory"
+    ]
+)
 ```
 
-### Initial Tool Suite
-
-| Tool | Slash Command | Permission | Description |
-| :--- | :--- | :--- | :--- |
-| **`calculator`** | `/calc <expr>` | `SAFE` | Safe AST-based math evaluation (`sqrt`, `sin`, `cos`, arithmetic) with exponential protection. |
-| **`web_search`** | `/search <query>` | `SAFE` | Queries live DuckDuckGo index and parses structured titles, clean URLs, and snippets. |
-| **`browser`** | `/browse <url>` | `CONTROLLED` | Fetches webpage and extracts readable article text, removing boilerplate scripts and tags. |
-| **`filesystem`** | `/file <path>` | `CONTROLLED` | Reads local workspace files with strict directory boundary containment. |
-| **`shell`** | `/shell <cmd>` | `DANGEROUS` | Executes local shell commands with timeout; requires explicit authorization in config. |
+Each task automatically logs timestamps, sub-step statuses (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`), execution durations, and can be queried or updated via REST endpoints (`/api/tasks`).
 
 ---
 
-## 8. Security & Permission Tiers
+## 7. Persistent Memory System
+
+Victor's memory layer is powered by SQLite (`data/victor_memory.db`) with zero external database dependencies:
+
+- **Preferences**: Key-value store for user preferences (e.g., `theme = dark`, `video_duration = <20m`, `code_style = concise`).
+- **Facts**: Curated facts about the user, projects, and environment. You can naturally say:
+  > *"Remember that our staging server is on port 9000"*
+  Victor automatically persists this to memory.
+- **Task Memory**: Structured intermediate context and findings retained across task runs.
+- **Conversation History**: Full multi-turn context retention.
+
+---
+
+## 8. Full Standardized Tool Suite
+
+Victor equips 9 standardized tools conforming to the `BaseTool` contract:
+
+| Tool | Slash Command | Permission Tier | Capabilities |
+| :--- | :--- | :--- | :--- |
+| **`youtube`** | `/youtube <query>` | `SAFE` | Searches YouTube for videos, playlists, tutorials, and channels with clean URLs and descriptions. |
+| **`web_search`** | `/search <query>` | `SAFE` | Queries DuckDuckGo for live internet results with snippets and clean URLs. |
+| **`browser`** | `/browse <url>` | `CONTROLLED` | Extracts clean, readable text from any web page, stripping ads, trackers, and scripts. |
+| **`applications`** | `/open <app_name>` | `SAFE` | Launches desktop software (Chrome, VS Code, Notepad, Terminal, Explorer) and lists available apps. |
+| **`computer`** | `/click <action>` | `CONTROLLED` | Controls the mouse cursor, performs left/right/double clicks, scrolls, and inspects active windows via native Windows `user32` ctypes. |
+| **`notifications`** | `/notify <msg>` | `SAFE` | Dispatches desktop and web toast alerts with sound cues. |
+| **`calculator`** | `/calc <expr>` | `SAFE` | Evaluates mathematical expressions using a safe AST parser with exponential safety limits. |
+| **`filesystem`** | `/file <path>` | `CONTROLLED` | Reads local workspace files with strict directory boundary containment. |
+| **`shell`** | `/shell <cmd>` | `DANGEROUS` | Executes local shell commands; gated behind explicit user authorization. |
+
+---
+
+## 9. Permission & Safety Architecture
+
+Security is enforced at the core through the `PermissionManager`:
 
 ```mermaid
 graph TD
-    subgraph PERMISSIONS["Security Hierarchy"]
-        SAFE["SAFE (No approval needed)"]
-        CONTROLLED["CONTROLLED (Confined to sandbox/read-only)"]
-        DANGEROUS["DANGEROUS (Requires explicit permission)"]
-    end
-
-    SAFE --> CALC["Calculator"]
-    SAFE --> SEARCH["Web Search"]
-    CONTROLLED --> BROWSER["Web Browser"]
-    CONTROLLED --> FILE["Filesystem (Root restricted)"]
-    DANGEROUS --> SHELL["Shell Command Execution"]
+    REQ["Tool Execution Request"] --> CLASSIFY["Permission Classifier"]
+    CLASSIFY -->|SAFE| EXEC["Execute Immediately"]
+    CLASSIFY -->|CONTROLLED| ROOT_CHECK["Check Sandboxing & Boundaries"]
+    ROOT_CHECK -->|In Boundary| EXEC
+    ROOT_CHECK -->|Boundary Breach| PROMPT["Raise Interactive Approval Modal"]
+    CLASSIFY -->|DANGEROUS| PROMPT
+    PROMPT -->|User Approves| EXEC
+    PROMPT -->|User Denies| ABORT["Abort & Return Permission Denied"]
 ```
 
-- **`SAFE`**: Deterministic computations and read-only search operations.
-- **`CONTROLLED`**: External web fetching and filesystem reading within permitted root paths (`allowed_file_roots`).
-- **`DANGEROUS`**: Arbitrary shell execution. Disabled by default (`allow_shell: false`). Attempted invocations return permission denial unless explicitly configured.
+- **SAFE**: Non-destructive operations (math, web queries, video search, toasts).
+- **CONTROLLED**: Reading files, opening URLs, and computer control. Bound to workspace roots.
+- **DANGEROUS**: Modifying system files, arbitrary shell commands. Always prompts for user confirmation.
 
 ---
 
-## 9. Installation & Setup
+## 10. Voice Input & Speech Output
 
-### Prerequisites
-- Python 3.10+ (tested on Python 3.14)
+Victor natively integrates the **Web Speech API**:
+- **Microphone (STT)**: Click the microphone icon in the message bar to speak naturally. Speech is automatically transcribed and sent as an input prompt.
+- **Voice Output (TTS)**: Toggle the speaker icon in the top navigation bar to have Victor vocalize its synthesized responses using system voices.
+
+---
+
+## 11. Installation & Setup
+
+### Requirements
+- Python 3.10+ (tested on Python 3.14 on Windows)
 - Git
-- *(Optional for local models)*: [Ollama](https://ollama.com/) with `qwen2:1.5b` or `qwen3.5:2b`
+- *(Optional)* [Ollama](https://ollama.com/) with `qwen2:1.5b` or `qwen2.5:3b`
 
-### Setup Steps
+### Setup
 
 ```bash
 # Clone the repository
@@ -247,47 +259,32 @@ pip install -r requirements.txt
 
 ---
 
-## 10. Usage Guide
+## 12. Quickstart Guide
 
-### Retro-Cyber Web Command Center
-
-Start the server:
-
+### 1. Launch the Control Center
 ```bash
 python -m victor.api.server
 ```
+Open **`http://localhost:8000`** in any web browser.
 
-Open your browser at: **`http://localhost:8000`**
-
-- View live status, active model, and installed capabilities.
-- Execute direct commands or chat naturally with Victor.
-- Inspect live tool execution traces with duration timers and outputs.
-
-### Terminal Interactive CLI
-
-Launch the terminal REPL:
-
+### 2. Launch the Desktop Companion Mascot
+In a separate terminal:
 ```bash
-python -m victor.cli
+python -m victor.desktop.mascot
 ```
+The desktop mascot will appear in the bottom-right corner of your screen.
 
-### Slash Commands Reference
-
-| Command | Syntax | Example |
-| :--- | :--- | :--- |
-| **Help** | `/help` | Display command index |
-| **Tools** | `/tools` | List registered capabilities & permission tiers |
-| **Clear** | `/clear` | Wipe current conversation history |
-| **Info** | `/info` | Display active node profile, core model, and settings |
-| **Calculate** | `/calc <expression>` | `/calc sqrt(256) * 10 + 4` |
-| **Search** | `/search <query>` | `/search latest compiler optimization advances` |
-| **Browse** | `/browse <url>` | `/browse https://en.wikipedia.org/wiki/Compiler` |
-| **Read File** | `/file <path>` | `/file config/victor.yaml` |
-| **Shell** | `/shell <command>` | `/shell dir` *(if authorized)* |
+### 3. Try Natural Commands
+In the web interface or voice input:
+- *"Search YouTube for modern web design tutorials"*
+- *"Remember that I prefer concise responses"*
+- *"Open Notepad"*
+- *"Calculate sqrt(1024) * 8"*
+- *"Search the web for the latest Python 3.14 release features"*
 
 ---
 
-## 11. Configuration Reference
+## 13. Configuration Reference
 
 Victor is configured via [`config/victor.yaml`](config/victor.yaml):
 
@@ -326,76 +323,107 @@ security:
 
 ---
 
-## 12. Testing & Verification
+## 14. Testing & Verification
 
-The project includes unit and integration tests covering tools, AST parsing, safety limits, slash commands, and API endpoints.
-
-Run the test suite:
+Run the full automated test suite:
 
 ```bash
 python -m pytest -v tests/
 ```
 
-Expected output:
+Results:
 ```text
 tests/test_agent.py::test_personality_prompt_generation PASSED
 tests/test_agent.py::test_agent_direct_slash_command PASSED
 tests/test_agent.py::test_agent_tools_listing_command PASSED
 tests/test_agent.py::test_agent_extract_tool_call PASSED
+tests/test_agent.py::test_agent_autonomous_intent_classification PASSED
+tests/test_agent.py::test_agent_autonomous_chat_routing PASSED
 tests/test_api.py::test_root_endpoint PASSED
 tests/test_api.py::test_api_status PASSED
 tests/test_api.py::test_api_tools PASSED
 tests/test_api.py::test_api_chat_slash_calc PASSED
+tests/test_memory.py::test_memory_preferences PASSED
+tests/test_memory.py::test_memory_facts PASSED
+tests/test_memory.py::test_task_memory PASSED
+tests/test_permissions.py::test_permission_classification PASSED
+tests/test_permissions.py::test_permission_request_resolution PASSED
+tests/test_permissions.py::test_permission_always_allow PASSED
+tests/test_tasks.py::test_task_lifecycle PASSED
 tests/test_tools.py::test_calculator_basic PASSED
 tests/test_tools.py::test_calculator_functions PASSED
 tests/test_tools.py::test_calculator_power_protection PASSED
 tests/test_tools.py::test_tool_registry_permissions PASSED
 tests/test_tools.py::test_filesystem_tool_boundary PASSED
-======================== 13 passed in 2.5s ========================
+tests/test_tools.py::test_youtube_tool PASSED
+tests/test_tools.py::test_applications_tool_list PASSED
+tests/test_tools.py::test_computer_tool_info PASSED
+tests/test_notification_tool.py PASSED
+======================== 26 passed in 4.45s ========================
 ```
 
 ---
 
-## 13. Project Directory Layout
+## 15. Project Directory Layout
 
 ```text
 Victor_The_Artificial_Soul/
 ├── config/
-│   └── victor.yaml              # Persona, model, and security configuration
+│   └── victor.yaml              # Personality, model, and security configuration
+├── data/
+│   └── victor_memory.db         # SQLite persistent memory store
 ├── tests/
-│   ├── test_agent.py            # Agent loop and prompt tests
-│   ├── test_api.py              # FastAPI endpoint integration tests
-│   └── test_tools.py            # Calculator, filesystem, registry tests
+│   ├── test_agent.py            # Agent intent classification & autonomous routing
+│   ├── test_api.py              # FastAPI endpoints & tool query tests
+│   ├── test_memory.py           # Preferences, facts, and task memory tests
+│   ├── test_permissions.py      # Permission hierarchy & request resolution
+│   ├── test_tasks.py            # Multi-step autonomous task lifecycle
+│   └── test_tools.py            # Tool suite tests (calc, browser, youtube, apps, computer)
 ├── victor/
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── server.py            # FastAPI REST & WebSocket server
+│   │   └── server.py            # FastAPI REST & WebSocket endpoints
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── agent.py             # Main Victor agent loop & command router
+│   │   ├── agent.py             # Core agent loop, autonomous router, memory integration
 │   │   ├── config.py            # YAML configuration loader
 │   │   ├── events.py            # Asynchronous EventBus
 │   │   └── personality.py       # Decoupled persona prompt builder
+│   ├── desktop/
+│   │   ├── __init__.py
+│   │   └── mascot.py            # Standalone transparent desktop companion
+│   ├── memory/
+│   │   ├── __init__.py
+│   │   └── store.py             # SQLite persistent memory store
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── base.py              # BaseLLM abstraction
 │   │   ├── factory.py           # Model provider factory
-│   │   ├── ollama.py            # Local Ollama provider with diagnostics
+│   │   ├── ollama.py            # Local Ollama provider with RAM diagnostics
 │   │   └── remote.py            # Remote OpenAI-compatible provider
+│   ├── permissions/
+│   │   ├── __init__.py
+│   │   └── manager.py           # Permission tiers, requests, and always-allow rules
+│   ├── tasks/
+│   │   ├── __init__.py
+│   │   └── manager.py           # Autonomous task engine & persistence
 │   ├── tools/
 │   │   ├── __init__.py
+│   │   ├── applications.py      # Desktop application launcher & lister
 │   │   ├── base.py              # BaseTool contract and PermissionLevel
 │   │   ├── browser.py           # Webpage fetcher & text extractor
-│   │   ├── calculator.py        # AST safe math evaluator
-│   │   ├── factory.py           # Standard tool registry factory
+│   │   ├── calculator.py        # Safe AST math evaluator
+│   │   ├── computer.py          # Native Windows mouse/click/window controller
+│   │   ├── factory.py           # Tool suite factory
 │   │   ├── filesystem.py        # Safe local file reader
-│   │   ├── registry.py          # Central tool registry
-│   │   ├── shell.py             # Permission-gated shell tool
-│   │   └── web_search.py        # Live DuckDuckGo search tool
+│   │   ├── notifications.py     # System desktop & web notifications
+│   │   ├── registry.py          # Tool registry & permission enforcement
+│   │   ├── shell.py             # Gated shell execution tool
+│   │   └── youtube.py           # YouTube video & playlist search tool
 │   ├── web/
-│   │   ├── app.js               # WebSocket client & retro UI logic
-│   │   ├── index.html           # Retro-cyber terminal HTML
-│   │   └── style.css            # Phosphor amber monospace stylesheet
+│   │   ├── app.js               # 7-view controller, mascot SVG animator, Web Speech API
+│   │   ├── index.html           # Full-bleed modern dashboard (zero screen boundary)
+│   │   └── style.css            # Modern minimal dark stylesheet (Linear x Raycast)
 │   └── cli.py                   # Terminal interactive REPL
 ├── .gitignore                   # Production gitignore
 ├── README.md                    # Comprehensive documentation
@@ -404,8 +432,6 @@ Victor_The_Artificial_Soul/
 
 ---
 
-## 14. Contributing & License
-
-Contributions are welcome! Please open an issue or submit a pull request for additional tools or model providers.
+## 16. License
 
 Distributed under the **MIT License**.

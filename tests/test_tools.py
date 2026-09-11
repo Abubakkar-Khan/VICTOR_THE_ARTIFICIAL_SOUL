@@ -66,3 +66,45 @@ async def test_filesystem_tool_boundary(tmp_path):
     assert res.success is True
     assert "Victor artificial mind test line 1" in res.output["content"]
     assert res.output["total_lines"] == 2
+
+
+@pytest.mark.asyncio
+async def test_youtube_tool():
+    from victor.tools.youtube import YouTubeTool
+    tool = YouTubeTool()
+    res = await tool.execute(query="compiler construction beginner")
+    assert res.success is True
+    assert res.output["count"] >= 1
+    assert "videos" in res.output
+    assert len(res.output["videos"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_applications_tool_list():
+    from victor.tools.applications import ApplicationTool
+    tool = ApplicationTool()
+    res = await tool.execute(action="list")
+    assert res.success is True
+    assert "applications" in res.output
+    names = [a["name"] for a in res.output["applications"]]
+    assert "notepad" in names or "terminal" in names or "chrome" in names
+
+
+@pytest.mark.asyncio
+async def test_computer_tool_info():
+    from victor.tools.computer import ComputerTool
+    tool = ComputerTool()
+    res = await tool.execute(action="screen_info")
+    assert res.success is True
+    assert res.output["screen_width"] > 0
+    assert res.output["screen_height"] > 0
+
+
+@pytest.mark.asyncio
+async def test_notification_tool():
+    from victor.tools.notifications import NotificationTool
+    tool = NotificationTool()
+    res = await tool.execute(message="Unit test notification", title="Victor")
+    assert res.success is True
+    assert res.output["status"] == "delivered"
+
