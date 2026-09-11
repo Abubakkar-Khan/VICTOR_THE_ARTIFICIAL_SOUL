@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Victor</title>
+  <title>Victor — The Artificial Soul</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,8 +14,8 @@
   <!-- Permission Modal -->
   <div id="permission-modal" class="modal-overlay">
     <div class="modal-box">
-      <div class="modal-heading">Victor wants to perform an action</div>
-      <p id="perm-desc" class="modal-text">Please confirm whether to allow this.</p>
+      <div class="modal-heading">Victor requests confirmation</div>
+      <p id="perm-desc" class="modal-text">Please confirm whether to allow this action.</p>
       <div id="perm-details" class="modal-detail">action details</div>
       <div class="modal-actions">
         <button id="btn-perm-deny" class="modal-btn danger">Deny</button>
@@ -29,11 +29,22 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
-      <div class="sidebar-brand">
-        <span class="brand-name">Victor</span>
-        <div class="brand-status">
-          <span class="status-dot" id="status-dot"></span>
-          <span id="status-text">idle</span>
+      
+      <!-- Victor Pixel Avatar Card -->
+      <div class="sidebar-avatar-card">
+        <div class="avatar-frame" id="avatar-frame" title="Click to interact with Victor">
+          <img id="victor-avatar" src="/static/sprites/idle.png" alt="Victor" class="avatar-sprite" />
+        </div>
+        <div class="avatar-meta">
+          <span class="brand-name">Victor</span>
+          <div class="brand-status">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">idle</span>
+          </div>
+          <div class="emotion-badge" id="emotion-badge" title="Artificial Soul Emotional State">
+            <span id="emotion-icon">😴</span>
+            <span id="emotion-name">Idle</span>
+          </div>
         </div>
       </div>
 
@@ -82,8 +93,14 @@
     <!-- Workspace -->
     <main class="workspace">
       <header class="workspace-header">
-        <span class="view-title" id="view-title">Chat</span>
+        <div class="header-left">
+          <span class="view-title" id="view-title">Chat</span>
+          <span class="cognitive-loop-badge" id="cognitive-badge">Perceive &bull; Act &bull; Reflect</span>
+        </div>
         <div class="header-actions">
+          <button class="header-btn" id="btn-sound-toggle" title="Toggle Celeste-style audio chimes">
+            <span id="sound-indicator-icon">&#9835;</span> Chimes: On
+          </button>
           <button class="header-btn" id="btn-clear" title="Clear conversation">clear</button>
         </div>
       </header>
@@ -95,7 +112,7 @@
           <div class="chat-messages" id="chat-feed">
             <div class="chat-empty" id="chat-empty">
               <span class="chat-empty-name">Victor</span>
-              <span class="chat-empty-hint">Ask me something, or tell me to do something. I can search the web, find videos, read files, open apps, and more.</span>
+              <span class="chat-empty-hint">A small artificial mind living on your computer. Ask questions, explore ideas, or direct Victor to operate applications, read files, and browse the web.</span>
             </div>
           </div>
           <div class="chat-composer">
@@ -103,17 +120,9 @@
               <textarea
                 id="chat-input"
                 class="composer-input"
-                placeholder="Say something..."
+                placeholder="Say something to Victor..."
                 rows="1"
               ></textarea>
-              <button class="composer-btn" id="btn-mic" title="Voice input">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-              </button>
               <button class="composer-btn" id="btn-send" title="Send">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13"/>
@@ -127,7 +136,7 @@
         <!-- Tasks View -->
         <section id="view-tasks" class="view-panel">
           <div class="tasks-container" id="tasks-container">
-            <div class="tasks-empty" id="tasks-empty">No tasks yet. Victor creates tasks when working on multi-step requests.</div>
+            <div class="tasks-empty" id="tasks-empty">No tasks yet. Victor creates autonomous task plans during multi-step cognitive loops.</div>
           </div>
         </section>
 
@@ -159,41 +168,55 @@
         <!-- Settings View -->
         <section id="view-settings" class="view-panel">
           <div class="settings-container">
+            
+            <!-- Emotion Studio -->
             <div class="settings-section">
-              <div class="settings-label">Model</div>
+              <div class="settings-label">Artificial Soul &bull; Emotion Studio</div>
+              <p class="settings-hint">Preview Victor's 8 emotional states and Celeste-style chimes.</p>
+              <div class="emotion-studio-grid" id="emotion-studio-grid">
+                <button class="emotion-btn" data-emotion="neutral"><span>😐</span> Neutral</button>
+                <button class="emotion-btn" data-emotion="happy"><span>😊</span> Happy</button>
+                <button class="emotion-btn" data-emotion="curious"><span>🤔</span> Curious</button>
+                <button class="emotion-btn" data-emotion="idle"><span>😴</span> Idle</button>
+                <button class="emotion-btn" data-emotion="thinking"><span>🧠</span> Thinking</button>
+                <button class="emotion-btn" data-emotion="excited"><span>😮</span> Excited</button>
+                <button class="emotion-btn" data-emotion="confused"><span>😕</span> Confused</button>
+                <button class="emotion-btn" data-emotion="concerned"><span>😔</span> Concerned</button>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-label">Audio Synthesis</div>
               <div class="settings-row">
-                <span>Active model</span>
+                <span>Celeste Retro Beeps</span>
+                <div class="settings-toggle on" id="sound-toggle"></div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-label">Neural Model Architecture</div>
+              <div class="settings-row">
+                <span>Active local model</span>
                 <select class="settings-select" id="model-select"></select>
               </div>
             </div>
 
             <div class="settings-section">
-              <div class="settings-label">Voice</div>
+              <div class="settings-label">Desktop Companion</div>
               <div class="settings-row">
-                <span>Speech output</span>
-                <div class="settings-toggle" id="tts-toggle"></div>
-              </div>
-              <div class="settings-row">
-                <span>Voice</span>
-                <select class="settings-select" id="voice-select"></select>
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-label">Companion</div>
-              <div class="settings-row">
-                <span>Desktop mascot</span>
+                <span>Floating Pixel Mascot</span>
                 <button class="settings-btn" id="btn-launch-mascot">Launch</button>
               </div>
             </div>
 
             <div class="settings-section">
-              <div class="settings-label">Security</div>
+              <div class="settings-label">Deterministic Security</div>
               <div class="settings-row">
-                <span>Shell commands</span>
+                <span>Raw shell execution</span>
                 <span class="settings-value" id="shell-status">disabled</span>
               </div>
             </div>
+
           </div>
         </section>
 

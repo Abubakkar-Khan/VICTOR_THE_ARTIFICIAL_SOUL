@@ -61,6 +61,11 @@ class ModelSwitchRequest(BaseModel):
     model_name: str
 
 
+class EmotionRequest(BaseModel):
+    emotion: str
+    reason: Optional[str] = None
+
+
 @app.get("/")
 async def root():
     index_file = web_dir / "index.html"
@@ -84,18 +89,27 @@ async def get_status():
     except Exception:
         active_model = agent.config.model.name
 
+    from victor.core.agent import EMOTIONS
     return {
         "name": agent.config.name,
         "title": agent.config.title,
         "tagline": agent.config.tagline,
         "status": "online" if is_online else "offline",
         "model": active_model,
+        "emotion": getattr(agent, "emotion", "idle"),
+        "emotions": EMOTIONS,
         "tools_count": len(agent.registry.list_tools()),
         "personality": agent.config.personality.model_dump(),
         "security": agent.config.security.model_dump(),
         "facts_count": len(agent.memory.list_facts()),
         "tasks_count": len(agent.tasks.list_all_tasks()),
     }
+
+
+@app.post("/api/emotion")
+async def set_emotion_endpoint(req: EmotionRequest):
+    await agent.set_emotion(req.emotion, reason=req.reason or "manual_switch")
+    return {"status": "ok", "emotion": agent.emotion}
 
 
 @app.get("/api/tools")

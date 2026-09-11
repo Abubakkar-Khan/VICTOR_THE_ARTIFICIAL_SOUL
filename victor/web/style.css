@@ -107,20 +107,71 @@ a:hover {
 /* ── Sidebar ────────────────────────────────────────────────────── */
 
 .sidebar {
-  width: 192px;
-  min-width: 192px;
+  width: 210px;
+  min-width: 210px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  padding: 24px 0;
+  padding: 20px 0;
   user-select: none;
 }
 
-.sidebar-brand {
-  padding: 0 20px 20px;
+/* ── Victor Pixel Avatar Card ────────────────────────────────────── */
+
+.sidebar-avatar-card {
+  padding: 0 16px 16px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.avatar-frame {
+  width: 140px;
+  height: 106px;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  cursor: pointer;
+}
+
+.avatar-frame:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 24px rgba(200, 149, 108, 0.25);
+}
+
+.avatar-sprite {
+  width: 132px;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  transition: opacity 200ms ease, transform 300ms ease;
+  animation: victorFloat 3.8s ease-in-out infinite;
+}
+
+@keyframes victorFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.avatar-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+  width: 100%;
 }
 
 .brand-name {
@@ -135,7 +186,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--text-tertiary);
   font-family: var(--font-mono);
@@ -158,6 +209,47 @@ a:hover {
 }
 .status-dot.error {
   background: var(--error);
+}
+
+.emotion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--accent-bright);
+  transition: all var(--transition);
+}
+
+.emotion-badge.thinking {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+.emotion-badge.happy {
+  border-color: #8BA888;
+  color: #8BA888;
+  box-shadow: 0 0 12px rgba(139, 168, 136, 0.25);
+}
+.emotion-badge.excited {
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+.emotion-badge.concerned {
+  border-color: var(--error);
+  color: var(--error);
+  box-shadow: 0 0 12px rgba(184, 92, 92, 0.25);
+}
+.emotion-badge.curious {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(200, 149, 108, 0.25);
 }
 
 @keyframes gentle-pulse {
@@ -1011,6 +1103,82 @@ a:hover {
   background: rgba(184, 92, 92, 0.1);
 }
 
+
+/* ── Header Extras & Badges ──────────────────────────────────────── */
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cognitive-loop-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  letter-spacing: 0.04em;
+  transition: all var(--transition);
+}
+
+.cognitive-loop-badge.active {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  box-shadow: 0 0 10px rgba(200, 149, 108, 0.2);
+}
+
+/* ── Emotion Studio (Settings) ──────────────────────────────────── */
+
+.settings-hint {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.emotion-studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.emotion-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.emotion-btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.emotion-btn.active {
+  border-color: var(--accent-bright);
+  color: var(--text-primary);
+  background: rgba(200, 149, 108, 0.15);
+  box-shadow: 0 0 12px rgba(200, 149, 108, 0.25);
+}
+
+.emotion-btn span {
+  font-size: 14px;
+}
 
 /* ── Utility ────────────────────────────────────────────────────── */
 

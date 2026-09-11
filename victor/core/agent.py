@@ -37,6 +37,18 @@ def strip_emojis(text: str) -> str:
     return re.sub(r"  +", " ", cleaned)
 
 
+EMOTIONS: Dict[str, Dict[str, str]] = {
+    "neutral": {"emoji": "😐", "label": "Neutral", "desc": "Normal interaction"},
+    "happy": {"emoji": "😊", "label": "Happy", "desc": "Successful/helpful outcome"},
+    "curious": {"emoji": "🤔", "label": "Curious", "desc": "Exploring/learning"},
+    "idle": {"emoji": "😴", "label": "Idle", "desc": "Nothing happening"},
+    "thinking": {"emoji": "🧠", "label": "Thinking", "desc": "Processing"},
+    "excited": {"emoji": "😮", "label": "Excited", "desc": "Interesting discovery"},
+    "confused": {"emoji": "😕", "label": "Confused", "desc": "Unclear request/problem"},
+    "concerned": {"emoji": "😔", "label": "Concerned", "desc": "Failure/problem"},
+}
+
+
 class VictorAgent:
     """The agent core. Coordinates personality, model, tools, memory, and tasks."""
 
@@ -60,15 +72,36 @@ class VictorAgent:
         self.tasks = tasks or TaskManager(memory_store=self.memory)
         self.router = ToolRouter(self.registry)
         self.history: List[ChatMessage] = []
+        self.emotion: str = "idle"
+
+    async def set_emotion(self, emotion: str, reason: str = ""):
+        """Update and broadcast the current emotional state."""
+        if emotion in EMOTIONS:
+            self.emotion = emotion
+            await self.event_bus.emit(
+                "agent.emotion",
+                emotion=emotion,
+                emoji=EMOTIONS[emotion]["emoji"],
+                label=EMOTIONS[emotion]["label"],
+                reason=reason,
+            )
 
     def get_system_prompt(self) -> str:
-        """Compile system prompt with tool descriptions and memory context."""
+        """Compile system prompt with tool descriptions, memory context, and emotional state."""
         tool_descriptions = self.registry.format_all_descriptions()
         base_prompt = self.personality.build_system_prompt(tool_descriptions)
         mem_summary = self.memory.get_context_summary()
+        prompt_parts = [base_prompt]
         if mem_summary:
-            return f"{base_prompt}\n\n{mem_summary}"
-        return base_prompt
+            prompt_parts.append(mem_summary)
+
+        current_emo = EMOTIONS.get(self.emotion, EMOTIONS["neutral"])
+        prompt_parts.append(
+            f"## Artificial Soul & Emotional State\n"
+            f"Current Emotion: {self.emotion.upper()} {current_emo['emoji']} ({current_emo['desc']}).\n"
+            f"Let this emotional state subtly shape your conversational tone and engagement, without explicitly stating your emotion."
+        )
+        return "\n\n".join(prompt_parts)
 
     def reset_conversation(self):
         """Clear conversation history."""
@@ -213,6 +246,7 @@ class VictorAgent:
                 fact = fact[9:].strip()
 
             self.memory.add_fact(fact, category="user_preference")
+            await self.set_emotion("happy", reason="Committed new memory")
             await self.event_bus.emit("agent.state", state="done")
             await self.event_bus.emit("memory.created", fact=fact)
             resp_text = f'Got it. I\'ll remember that: "{fact}"'
@@ -223,9 +257,17 @@ class VictorAgent:
                 "content": resp_text,
                 "tool_executed": None,
                 "duration": 0.05,
+                "emotion": self.emotion,
             }
 
         await self.event_bus.emit("agent.started", mode="chat", user_message=user_message)
+        
+        # Initial emotion upon receiving message
+        if any(g in lower_msg for g in ["hello", "hi", "hey", "good morning", "good evening"]):
+            await self.set_emotion("neutral", reason="Greeting")
+        else:
+            await self.set_emotion("curious", reason="Received inquiry")
+            
         await self.event_bus.emit("agent.state", state="thinking")
         self.history.append(ChatMessage(role="user", content=user_message))
 
@@ -246,6 +288,7 @@ class VictorAgent:
             step = task.add_step(name=tool_name, tool=tool_name)
             step.status = "running"
 
+            await self.set_emotion("thinking", reason=f"Executing {tool_name}")
             await self.event_bus.emit("agent.state", state="working")
             await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
             result: ToolResult = await self.registry.execute_tool(tool_name, **parameters)
@@ -255,10 +298,15 @@ class VictorAgent:
                 step.status = "completed"
                 step.output = str(result.output)[:200]
                 await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                if tool_name in ["web_search", "youtube", "browser"]:
+                    await self.set_emotion("excited", reason="Discovered live web information")
+                else:
+                    await self.set_emotion("happy", reason="Action succeeded")
             else:
                 step.status = "failed"
                 step.output = str(result.error)
                 await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
+                await self.set_emotion("concerned", reason=f"Tool {tool_name} encountered an error")
 
             tool_executed_info = {
                 "name": tool_name,
@@ -300,6 +348,7 @@ class VictorAgent:
 
         # Case B: LLM reasoning with potential tool calling
         else:
+            await self.set_emotion("thinking", reason="Decomposing request via neural inference")
             await self.event_bus.emit("agent.thinking", state="planning")
             llm_resp = await self.llm.generate(
                 messages=self.history,
@@ -320,14 +369,17 @@ class VictorAgent:
                     except Exception:
                         parameters = {}
 
+                await self.set_emotion("thinking", reason=f"Invoking {tool_name}")
                 await self.event_bus.emit("agent.state", state="working")
                 await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
                 result = await self.registry.execute_tool(tool_name, **parameters)
 
                 if result.success:
                     await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                    await self.set_emotion("happy", reason=f"{tool_name} completed successfully")
                 else:
                     await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
+                    await self.set_emotion("concerned", reason=f"{tool_name} failed")
 
                 tool_executed_info = {
                     "name": tool_name,
@@ -365,17 +417,24 @@ class VictorAgent:
                     final_content = obs_formatted
             else:
                 final_content = strip_emojis(initial_content.strip())
+                if "?" in user_message and not any(w in final_content.lower() for w in ["cannot", "sorry", "error"]):
+                    await self.set_emotion("happy", reason="Answered inquiry")
+                elif any(w in final_content.lower() for w in ["unclear", "what do you mean", "could not understand"]):
+                    await self.set_emotion("confused", reason="Request was ambiguous")
+                else:
+                    await self.set_emotion("neutral", reason="Normal dialogue")
 
         self.history.append(ChatMessage(role="assistant", content=final_content))
         duration = round(time.perf_counter() - start_time, 3)
         await self.event_bus.emit("agent.state", state="idle")
-        await self.event_bus.emit("agent.completed", duration=duration)
+        await self.event_bus.emit("agent.completed", duration=duration, emotion=self.emotion)
 
         return {
             "type": "chat_response",
             "content": final_content,
             "tool_executed": tool_executed_info,
             "duration": duration,
+            "emotion": self.emotion,
         }
 
     async def chat_stream(self, user_message: str) -> AsyncIterator[Dict[str, Any]]:

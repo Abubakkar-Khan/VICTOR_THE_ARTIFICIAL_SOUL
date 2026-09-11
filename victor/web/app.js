@@ -1,24 +1,151 @@
 /* ================================================================
    Victor — The Artificial Soul
-   Workshop Client
+   Workshop Client & Cognitive Audio Engine
    
-   Handles WebSocket events, REST API calls, and view rendering.
-   Typography-first. Quiet. No emojis.
+   8-Emotion Sprite Integration, Celeste Procedural Sound Synthesis,
+   Real-Time Telemetry & Cognitive Intelligence Loop
    ================================================================ */
 
 (function () {
   'use strict';
+
+  // ── 8 Artificial Soul Emotions ──────────────────────────────────
+
+  const EMOTIONS = {
+    neutral:   { emoji: '😐', label: 'Neutral',   sprite: '/static/sprites/neutral.png',   color: '#E8E4DE', desc: 'Normal interaction' },
+    happy:     { emoji: '😊', label: 'Happy',     sprite: '/static/sprites/happy.png',     color: '#8BA888', desc: 'Successful outcome' },
+    curious:   { emoji: '🤔', label: 'Curious',   sprite: '/static/sprites/curious.png',   color: '#C8956C', desc: 'Exploring & learning' },
+    idle:      { emoji: '😴', label: 'Idle',      sprite: '/static/sprites/idle.png',      color: '#8A8578', desc: 'Resting & standby' },
+    thinking:  { emoji: '🧠', label: 'Thinking',  sprite: '/static/sprites/thinking.png',  color: '#D4A574', desc: 'Processing reasoning' },
+    excited:   { emoji: '😮', label: 'Excited',   sprite: '/static/sprites/excited.png',   color: '#F59E0B', desc: 'Interesting discovery' },
+    confused:  { emoji: '😕', label: 'Confused',  sprite: '/static/sprites/confused.png',  color: '#E07A5F', desc: 'Unclear problem' },
+    concerned: { emoji: '😔', label: 'Concerned', sprite: '/static/sprites/concerned.png', color: '#B85C5C', desc: 'Encountered failure' }
+  };
+
+
+  // ── Celeste-Style Procedural Audio Synthesizer ─────────────────
+  // No robotic TTS! Pure electronic pentatonic blips & warm chimes.
+
+  class CelesteSynthesizer {
+    constructor() {
+      this.ctx = null;
+      this.enabled = true;
+      this.volume = 0.12;
+      // Warm pentatonic frequencies (Hz)
+      this.pentatonic = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
+    }
+
+    _init() {
+      if (!this.ctx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) this.ctx = new AudioContextClass();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+    }
+
+    // Single retro dialogue blip
+    playBlip(freqOverride) {
+      if (!this.enabled) return;
+      this._init();
+      if (!this.ctx) return;
+
+      try {
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        const freq = freqOverride || this.pentatonic[Math.floor(Math.random() * this.pentatonic.length)];
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(this.volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.055);
+      } catch (e) {}
+    }
+
+    // Melodic speech burst synchronized with response
+    playSpeechStream(tokenCount = 5) {
+      if (!this.enabled) return;
+      const count = Math.min(tokenCount, 8);
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+          this.playBlip();
+        }, i * 45);
+      }
+    }
+
+    // Thinking musical arpeggio
+    playThinkingArpeggio() {
+      if (!this.enabled) return;
+      this._init();
+      if (!this.ctx) return;
+
+      try {
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const start = this.ctx.currentTime + (idx * 0.07);
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, start);
+
+          gain.gain.setValueAtTime(0, start);
+          gain.gain.linearRampToValueAtTime(this.volume * 0.8, start + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(start);
+          osc.stop(start + 0.23);
+        });
+      } catch (e) {}
+    }
+
+    // Emotion-specific sound cue
+    playEmotionCue(emotion) {
+      if (!this.enabled) return;
+      this._init();
+      if (!this.ctx) return;
+
+      const cues = {
+        happy: [659.25, 880.00],
+        excited: [587.33, 783.99, 1046.50],
+        curious: [440.00, 659.25],
+        thinking: [523.25, 659.25],
+        confused: [493.88, 440.00],
+        concerned: [440.00, 392.00],
+        neutral: [523.25],
+        idle: [392.00]
+      };
+
+      const seq = cues[emotion] || [523.25];
+      seq.forEach((freq, idx) => {
+        setTimeout(() => {
+          this.playBlip(freq);
+        }, idx * 60);
+      });
+    }
+  }
+
+  const synth = new CelesteSynthesizer();
+
 
   // ── State ──────────────────────────────────────────────────────
 
   let ws = null;
   let wsRetryDelay = 1000;
   let currentView = 'chat';
-  let ttsEnabled = false;
-  let speechSynth = window.speechSynthesis || null;
-  let selectedVoice = null;
-  let recognition = null;
-  let isListening = false;
+  let currentEmotion = 'idle';
 
 
   // ── DOM References ─────────────────────────────────────────────
@@ -28,24 +155,30 @@
 
   const statusDot = $('#status-dot');
   const statusText = $('#status-text');
+  const victorAvatar = $('#victor-avatar');
+  const avatarFrame = $('#avatar-frame');
+  const emotionBadge = $('#emotion-badge');
+  const emotionIcon = $('#emotion-icon');
+  const emotionName = $('#emotion-name');
+  const cognitiveBadge = $('#cognitive-badge');
+  const btnSoundToggle = $('#btn-sound-toggle');
+  const soundIndicatorIcon = $('#sound-indicator-icon');
+
   const modelName = $('#model-name');
   const viewTitle = $('#view-title');
   const chatFeed = $('#chat-feed');
   const chatEmpty = $('#chat-empty');
   const chatInput = $('#chat-input');
   const btnSend = $('#btn-send');
-  const btnMic = $('#btn-mic');
   const btnClear = $('#btn-clear');
   const tasksContainer = $('#tasks-container');
-  const tasksEmpty = $('#tasks-empty');
   const factsList = $('#facts-list');
   const prefsList = $('#prefs-list');
   const factInput = $('#fact-input');
   const btnAddFact = $('#btn-add-fact');
   const toolsList = $('#tools-list');
   const modelSelect = $('#model-select');
-  const ttsToggle = $('#tts-toggle');
-  const voiceSelect = $('#voice-select');
+  const soundToggle = $('#sound-toggle');
   const btnLaunchMascot = $('#btn-launch-mascot');
   const shellStatus = $('#shell-status');
   const permModal = $('#permission-modal');
@@ -72,13 +205,11 @@
     $$('.view-panel').forEach(panel => panel.classList.toggle('active', panel.id === `view-${view}`));
     viewTitle.textContent = viewNames[view] || view;
 
-    // Lazy-load data for views
     if (view === 'tasks') loadTasks();
     if (view === 'memory') loadMemory();
     if (view === 'tools') loadTools();
     if (view === 'settings') loadSettings();
 
-    // Show/hide header clear button (only on chat)
     btnClear.style.display = view === 'chat' ? '' : 'none';
   }
 
@@ -87,9 +218,73 @@
   });
 
 
-  // ── Agent State ────────────────────────────────────────────────
+  // ── Emotion & Artificial Soul State ─────────────────────────────
 
-  function setAgentState(state) {
+  function setEmotion(name, playCue = true) {
+    if (!EMOTIONS[name]) name = 'neutral';
+    currentEmotion = name;
+    const data = EMOTIONS[name];
+
+    // Update sprite with smooth transition
+    if (victorAvatar) {
+      victorAvatar.style.opacity = '0.3';
+      setTimeout(() => {
+        victorAvatar.src = data.sprite;
+        victorAvatar.style.opacity = '1';
+      }, 100);
+    }
+
+    // Update emotion badge
+    if (emotionIcon) emotionIcon.textContent = data.emoji;
+    if (emotionName) emotionName.textContent = data.label;
+    if (emotionBadge) {
+      emotionBadge.className = `emotion-badge ${name}`;
+    }
+
+    // Highlight active button in Emotion Studio (Settings)
+    $$('.emotion-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.emotion === name);
+    });
+
+    // Sound cue
+    if (playCue) {
+      synth.playEmotionCue(name);
+    }
+  }
+
+  // Interactive Avatar Click
+  if (avatarFrame) {
+    const cycleList = ['neutral', 'happy', 'curious', 'thinking', 'excited', 'confused', 'concerned', 'idle'];
+    avatarFrame.addEventListener('click', () => {
+      const nextIdx = (cycleList.indexOf(currentEmotion) + 1) % cycleList.length;
+      const nextEmo = cycleList[nextIdx];
+      setEmotion(nextEmo, true);
+      // Inform backend
+      fetch('/api/emotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emotion: nextEmo, reason: 'user_click' })
+      }).catch(() => {});
+    });
+  }
+
+  // Emotion Studio Buttons
+  $$('.emotion-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const emo = btn.dataset.emotion;
+      setEmotion(emo, true);
+      fetch('/api/emotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emotion: emo, reason: 'studio_preview' })
+      }).catch(() => {});
+    });
+  });
+
+
+  // ── Agent State & Cognitive Loop ───────────────────────────────
+
+  function setAgentState(state, cognitivePhase = '') {
     statusDot.className = 'status-dot';
     if (state === 'thinking' || state === 'working') {
       statusDot.classList.add(state);
@@ -100,6 +295,44 @@
     if (state === 'idle' || state === 'done') {
       statusText.textContent = 'idle';
     }
+
+    if (cognitiveBadge) {
+      if (cognitivePhase) {
+        cognitiveBadge.textContent = cognitivePhase;
+        cognitiveBadge.classList.add('active');
+      } else if (state === 'thinking') {
+        cognitiveBadge.textContent = 'Reasoning • Synthesizing';
+        cognitiveBadge.classList.add('active');
+      } else if (state === 'working') {
+        cognitiveBadge.textContent = 'Acting • Observing';
+        cognitiveBadge.classList.add('active');
+      } else {
+        cognitiveBadge.textContent = 'Perceive • Act • Reflect';
+        cognitiveBadge.classList.remove('active');
+      }
+    }
+  }
+
+
+  // ── Audio Controls ─────────────────────────────────────────────
+
+  function toggleSound() {
+    synth.enabled = !synth.enabled;
+    const label = synth.enabled ? 'Chimes: On' : 'Chimes: Off';
+    btnSoundToggle.innerHTML = `<span id="sound-indicator-icon">${synth.enabled ? '&#9835;' : '&#10006;'}</span> ${label}`;
+    if (soundToggle) {
+      soundToggle.classList.toggle('on', synth.enabled);
+    }
+    if (synth.enabled) {
+      synth.playBlip(659.25);
+    }
+  }
+
+  if (btnSoundToggle) {
+    btnSoundToggle.addEventListener('click', toggleSound);
+  }
+  if (soundToggle) {
+    soundToggle.addEventListener('click', toggleSound);
   }
 
 
@@ -116,7 +349,6 @@
   }
 
   function formatMarkdown(text) {
-    // Simple markdown: bold, italic, code blocks, inline code, links, line breaks
     let html = escapeHtml(text);
 
     // Code blocks
@@ -127,25 +359,17 @@
     // Inline code
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
-    // Bold
+    // Bold & Italic
     html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-    // Italic
     html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
     // Links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-
-    // Bare URLs
     html = html.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/gm, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
 
-    // Line breaks to paragraphs
     const paras = html.split(/\n\n+/).filter(p => p.trim());
     if (paras.length > 1) {
-      html = paras.map(p => {
-        if (p.startsWith('<pre>')) return p;
-        return `<p>${p.replace(/\n/g, '<br>')}</p>`;
-      }).join('');
+      html = paras.map(p => p.startsWith('<pre>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
     } else {
       html = html.replace(/\n/g, '<br>');
     }
@@ -195,7 +419,6 @@
 
   function appendThinking() {
     hideEmptyState();
-    // Remove previous thinking indicator
     const prev = chatFeed.querySelector('.thinking-indicator');
     if (prev) prev.remove();
 
@@ -218,7 +441,7 @@
     });
   }
 
-  // Auto-resize textarea
+  // Textarea auto-resize
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
@@ -235,8 +458,27 @@
     chatInput.value = '';
     chatInput.style.height = 'auto';
 
+    setEmotion('curious', false);
+    setAgentState('thinking', 'Perceiving Directive');
+    appendThinking();
+    synth.playThinkingArpeggio();
+
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'chat', message: text }));
+    } else {
+      // Fallback to REST
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      })
+      .then(r => r.json())
+      .then(handleChatResponse)
+      .catch(() => {
+        removeThinking();
+        setEmotion('concerned');
+        setAgentState('idle');
+      });
     }
   }
 
@@ -254,6 +496,7 @@
       chatFeed.appendChild(chatEmpty);
       chatEmpty.style.display = '';
     }
+    setEmotion('neutral', false);
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -289,37 +532,54 @@
       try {
         const msg = JSON.parse(evt.data);
         handleServerMessage(msg);
-      } catch (e) {
-        // Ignore malformed messages
-      }
+      } catch (e) {}
     };
   }
 
+  function handleChatResponse(data) {
+    removeThinking();
+    setAgentState('idle');
+
+    const text = stripEmojis(data.content || data.response || '');
+    if (text) {
+      appendMessage('Victor', text);
+      synth.playSpeechStream(6);
+    }
+
+    if (data.emotion) {
+      setEmotion(data.emotion, false);
+    }
+  }
+
   function handleServerMessage(msg) {
-    if (msg.type === 'event') {
-      const topic = msg.topic || '';
-      const data = msg.data || {};
+    // Normal event or nested event format
+    const eventObj = msg.event || msg;
+    const topic = eventObj.topic || msg.topic || '';
+    const data = eventObj.data || msg.data || {};
+
+    if (msg.type === 'event' || topic) {
+
+      if (topic === 'agent.emotion') {
+        if (data.emotion) {
+          setEmotion(data.emotion, true);
+        }
+      }
 
       if (topic === 'agent.started') {
-        setAgentState('thinking');
+        setAgentState('thinking', 'Perceive & Decompose');
         appendThinking();
+        synth.playThinkingArpeggio();
       }
 
       if (topic === 'agent.thinking') {
-        setAgentState('thinking');
-      }
-
-      if (topic === 'agent.state') {
-        setAgentState(data.state || 'idle');
+        setAgentState('thinking', 'Neural Inference');
+        setEmotion('thinking', false);
       }
 
       if (topic === 'tool.started') {
         removeThinking();
-        setAgentState('working');
-        currentToolAnnotation = appendToolAnnotation(
-          data.tool || 'tool',
-          'active'
-        );
+        setAgentState('working', `Acting: ${data.tool || 'tool'}`);
+        currentToolAnnotation = appendToolAnnotation(data.tool || 'tool', 'active');
       }
 
       if (topic === 'tool.completed') {
@@ -327,10 +587,13 @@
           currentToolAnnotation.classList.remove('active');
           currentToolAnnotation.classList.add('done');
           const dur = data.duration ? `${data.duration.toFixed(1)}s` : '';
-          if (dur) {
-            currentToolAnnotation.textContent += ` \u00B7 ${dur}`;
-          }
+          if (dur) currentToolAnnotation.textContent += ` \u00B7 ${dur}`;
           currentToolAnnotation = null;
+        }
+        if (['web_search', 'youtube', 'browser'].includes(data.tool)) {
+          setEmotion('excited');
+        } else {
+          setEmotion('happy');
         }
       }
 
@@ -340,37 +603,25 @@
           currentToolAnnotation.classList.add('failed');
           currentToolAnnotation = null;
         }
+        setEmotion('concerned');
       }
 
       if (topic === 'agent.completed') {
         setAgentState('idle');
         removeThinking();
+        if (data.emotion) {
+          setEmotion(data.emotion, false);
+        }
       }
 
       if (topic === 'permission.requested') {
+        setEmotion('confused');
         showPermissionModal(data);
-      }
-
-      // Mascot state events (map to agent state)
-      if (topic === 'mascot.state_changed') {
-        const stateMap = {
-          idle: 'idle', listening: 'listening', thinking: 'thinking',
-          working: 'working', completed: 'idle', error: 'error',
-          perked: 'thinking', focused: 'working', thoughtful: 'thinking',
-          happy: 'idle'
-        };
-        setAgentState(stateMap[data.state] || 'idle');
       }
     }
 
     if (msg.type === 'chat_result') {
-      removeThinking();
-      setAgentState('idle');
-      const text = stripEmojis(msg.response || msg.data?.response || '');
-      if (text) {
-        appendMessage('Victor', text);
-        if (ttsEnabled) speakText(text);
-      }
+      handleChatResponse(msg.data || msg);
     }
   }
 
@@ -390,11 +641,10 @@
   function renderTasks(tasks) {
     tasksContainer.innerHTML = '';
     if (!tasks.length) {
-      tasksContainer.innerHTML = '<div class="tasks-empty">No tasks yet. Victor creates tasks when working on multi-step requests.</div>';
+      tasksContainer.innerHTML = '<div class="tasks-empty">No tasks yet. Victor creates autonomous task plans during multi-step cognitive loops.</div>';
       return;
     }
 
-    // Sort: active first, then by most recent
     tasks.sort((a, b) => {
       if (a.status === 'running' && b.status !== 'running') return -1;
       if (b.status === 'running' && a.status !== 'running') return 1;
@@ -467,9 +717,7 @@
       const data = await res.json();
       renderFacts(data.facts || []);
       renderPrefs(data.preferences || {});
-    } catch (e) {
-      // Silent
-    }
+    } catch (e) {}
   }
 
   function renderFacts(facts) {
@@ -539,6 +787,7 @@
     });
     factInput.value = '';
     loadMemory();
+    setEmotion('happy');
   });
 
   factInput.addEventListener('keydown', (e) => {
@@ -597,9 +846,12 @@
       const res = await fetch('/api/status');
       const data = await res.json();
       shellStatus.textContent = data.security?.allow_shell ? 'enabled' : 'disabled';
+      if (data.emotion) {
+        setEmotion(data.emotion, false);
+      }
     } catch (e) {}
 
-    // Load models
+    // Load available models
     try {
       const res = await fetch('/api/models');
       const data = await res.json();
@@ -621,9 +873,6 @@
         modelSelect.appendChild(opt);
       }
     } catch (e) {}
-
-    // Populate voice list
-    populateVoices();
   }
 
   modelSelect.addEventListener('change', async () => {
@@ -634,93 +883,18 @@
         body: JSON.stringify({ model_name: modelSelect.value })
       });
       modelName.textContent = modelSelect.value;
+      setEmotion('curious');
     } catch (e) {}
   });
 
-  // TTS toggle
-  ttsToggle.addEventListener('click', () => {
-    ttsEnabled = !ttsEnabled;
-    ttsToggle.classList.toggle('on', ttsEnabled);
-  });
-
-  function populateVoices() {
-    if (!speechSynth) return;
-    const voices = speechSynth.getVoices();
-    voiceSelect.innerHTML = '';
-    voices.forEach((v, i) => {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = `${v.name} (${v.lang})`;
-      voiceSelect.appendChild(opt);
-    });
-  }
-
-  if (speechSynth && speechSynth.onvoiceschanged !== undefined) {
-    speechSynth.onvoiceschanged = populateVoices;
-  }
-
-  voiceSelect.addEventListener('change', () => {
-    const voices = speechSynth ? speechSynth.getVoices() : [];
-    selectedVoice = voices[parseInt(voiceSelect.value)] || null;
-  });
-
-  function speakText(text) {
-    if (!speechSynth || !ttsEnabled) return;
-    speechSynth.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    if (selectedVoice) utt.voice = selectedVoice;
-    utt.rate = 1.0;
-    utt.pitch = 1.0;
-    speechSynth.speak(utt);
-  }
-
-  // Launch mascot
+  // Launch Desktop Mascot
   btnLaunchMascot.addEventListener('click', async () => {
     try {
       await fetch('/api/mascot/launch', { method: 'POST' });
       btnLaunchMascot.textContent = 'Launched';
+      synth.playEmotionCue('happy');
       setTimeout(() => { btnLaunchMascot.textContent = 'Launch'; }, 2000);
     } catch (e) {}
-  });
-
-
-  // ── Voice Input (STT) ─────────────────────────────────────────
-
-  if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      chatInput.value = transcript;
-      sendMessage();
-    };
-
-    recognition.onend = () => {
-      isListening = false;
-      btnMic.classList.remove('active');
-      setAgentState('idle');
-    };
-
-    recognition.onerror = () => {
-      isListening = false;
-      btnMic.classList.remove('active');
-    };
-  }
-
-  btnMic.addEventListener('click', () => {
-    if (!recognition) return;
-    if (isListening) {
-      recognition.stop();
-    } else {
-      recognition.start();
-      isListening = true;
-      btnMic.classList.add('active');
-      setAgentState('listening');
-    }
   });
 
 
@@ -730,7 +904,7 @@
 
   function showPermissionModal(data) {
     pendingPermissionId = data.request_id || data.id;
-    permDesc.textContent = data.description || 'Victor wants to perform an action.';
+    permDesc.textContent = data.description || 'Victor requests authorization for an external computer action.';
     permDetails.textContent = data.details || data.action || 'system action';
     permModal.classList.add('visible');
   }
@@ -744,6 +918,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request_id: pendingPermissionId, decision })
       });
+      if (decision === 'deny') {
+        setEmotion('concerned');
+      } else {
+        setEmotion('happy');
+      }
     } catch (e) {}
     pendingPermissionId = null;
   }
@@ -756,14 +935,15 @@
   // ── Initialization ─────────────────────────────────────────────
 
   async function init() {
-    // Load status
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
       modelName.textContent = data.model || 'qwen2:1.5b';
+      if (data.emotion) {
+        setEmotion(data.emotion, false);
+      }
     } catch (e) {}
 
-    // Connect WebSocket
     initWebSocket();
   }
 
