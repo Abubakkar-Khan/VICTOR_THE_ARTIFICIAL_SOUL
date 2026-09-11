@@ -10,7 +10,7 @@ client = TestClient(app)
 def test_root_endpoint():
     res = client.get("/")
     assert res.status_code == 200
-    assert "Victor" in res.text
+    assert "Dexter" in res.text or "Dextex" in res.text
 
 
 def test_api_status():
@@ -99,11 +99,12 @@ def test_api_mascot_visibility_and_status():
 
 
 def test_api_mascot_options():
-    res = client.post("/api/mascot/options", json={"auto_hide": False, "scale": "compact"})
+    res = client.post("/api/mascot/options", json={"auto_hide": False, "scale": "compact", "click_action": "listen"})
     assert res.status_code == 200
     opts = res.json()["companion_options"]
     assert opts["auto_hide"] is False
     assert opts["scale"] == "compact"
+    assert opts["click_action"] == "listen"
 
 
 def test_api_stt_text_passthrough():

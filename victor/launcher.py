@@ -119,12 +119,12 @@ def main():
     try:
         import webview
         window = webview.create_window(
-            title="Victor // The Artificial Soul",
+            title="Dextex // The Artificial Soul",
             url=target_url,
             width=1160,
             height=760,
             min_size=(800, 600),
-            background_color="#0A0B0D",
+            background_color="#080A0F",
             text_select=True,
         )
         if icon_file.exists():

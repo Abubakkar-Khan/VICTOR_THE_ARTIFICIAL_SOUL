@@ -150,6 +150,13 @@ class VictorBuilder:
         self.log("5/5", "Finalizing distribution artifacts...")
         victor_dist = self.dist_dir / "Victor"
 
+        # Provide Dextex.exe alias executable
+        victor_exe = victor_dist / "Victor.exe"
+        dextex_exe = victor_dist / "Dextex.exe"
+        if victor_exe.exists():
+            shutil.copy2(victor_exe, dextex_exe)
+            print("      [OK] Provided Dextex.exe alias executable in dist/Victor/")
+
         # Ensure config directory is accessible in root dist folder for user customization
         user_config_dir = victor_dist / "config"
         user_config_dir.mkdir(exist_ok=True)
@@ -159,7 +166,7 @@ class VictorBuilder:
             print("      [OK] Seeded user config at dist/Victor/config/victor.yaml")
 
         if self.make_zip:
-            zip_path = self.dist_dir / "Victor-Standalone-v2.5.zip"
+            zip_path = self.dist_dir / "Dextex-Standalone-v2.7.zip"
             print(f"      Packaging zip archive: {zip_path.name}...")
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for root, _, files in os.walk(victor_dist):

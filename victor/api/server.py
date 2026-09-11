@@ -79,6 +79,8 @@ class CompanionOptionsRequest(BaseModel):
     auto_hide: Optional[bool] = None
     scale: Optional[str] = None
     always_on_top: Optional[bool] = None
+    click_action: Optional[str] = None
+    dialog_theme: Optional[str] = None
 
 
 class STTRequest(BaseModel):
@@ -93,7 +95,10 @@ workshop_state = {
         "auto_hide": True,
         "scale": "normal",
         "always_on_top": True,
-    }
+        "click_action": "listen",
+        "dialog_theme": "laboratory",
+    },
+    "latest_chat": None,
 }
 
 
@@ -163,6 +168,7 @@ async def get_status():
         "tasks_count": tasks_count,
         "workshop_focused": workshop_state["focused"],
         "companion_options": workshop_state["companion_options"],
+        "latest_chat": workshop_state.get("latest_chat"),
     }
 
 
@@ -181,6 +187,7 @@ async def get_mascot_status():
         "workshop_focused": workshop_state["focused"],
         "emotion": getattr(agent, "emotion", "idle"),
         "companion_options": workshop_state["companion_options"],
+        "latest_chat": workshop_state.get("latest_chat"),
     }
 
 
@@ -192,6 +199,10 @@ async def update_mascot_options(req: CompanionOptionsRequest):
         workshop_state["companion_options"]["scale"] = req.scale
     if req.always_on_top is not None:
         workshop_state["companion_options"]["always_on_top"] = req.always_on_top
+    if req.click_action is not None:
+        workshop_state["companion_options"]["click_action"] = req.click_action
+    if req.dialog_theme is not None:
+        workshop_state["companion_options"]["dialog_theme"] = req.dialog_theme
     await agent.event_bus.emit("companion.options", options=workshop_state["companion_options"])
     return {"status": "ok", "companion_options": workshop_state["companion_options"]}
 
@@ -217,6 +228,56 @@ async def stt_endpoint(req: STTRequest):
     return {"status": "ok", "text": ""}
 
 
+@app.post("/api/stt/listen")
+async def stt_listen_endpoint():
+    """Capture microphone directly from backend hardware with AGC and transcribe."""
+    import asyncio
+
+    def _capture_and_transcribe():
+        try:
+            import sounddevice as sd
+            import numpy as np
+            from scipy.io import wavfile
+            import io
+            import speech_recognition as sr
+
+            dev = sd.query_devices(kind="input")
+            fs = int(dev.get("default_samplerate", 44100))
+            duration = 4.0
+            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype="int16")
+            sd.wait()
+
+            peak = int(np.max(np.abs(recording)))
+            if peak < 25:
+                return {"status": "silent", "text": "", "message": "Nothing heard."}
+
+            # Automatic Gain Control (AGC): gently normalize soft voices to ~16000 headroom
+            gain = min(12.0, 16000.0 / max(1.0, float(peak)))
+            norm_rec = np.clip(recording.astype(np.float32) * gain, -32767, 32767).astype(np.int16)
+
+            wav_io = io.BytesIO()
+            wavfile.write(wav_io, fs, norm_rec)
+            wav_io.seek(0)
+
+            recognizer = sr.Recognizer()
+            recognizer.energy_threshold = 300
+            recognizer.dynamic_energy_threshold = True
+            with sr.AudioFile(wav_io) as source:
+                audio_data = recognizer.record(source)
+                try:
+                    text = recognizer.recognize_google(audio_data)
+                    return {"status": "ok", "text": text}
+                except sr.UnknownValueError:
+                    return {"status": "silent", "text": "", "message": "Could not understand audio."}
+                except sr.RequestError as re:
+                    return {"status": "error", "error": f"STT network error: {re}", "text": ""}
+        except Exception as e:
+            return {"status": "error", "error": str(e), "text": ""}
+
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _capture_and_transcribe)
+
+
 @app.post("/api/emotion")
 async def set_emotion_endpoint(req: EmotionRequest):
     await agent.set_emotion(req.emotion, reason=req.reason or "manual_switch")
@@ -226,7 +287,14 @@ async def set_emotion_endpoint(req: EmotionRequest):
 @app.post("/api/poke")
 async def poke_endpoint():
     """Respond dynamically to user click/poke without mechanical emotion cycling."""
-    return await agent.poke()
+    res = await agent.poke()
+    workshop_state["latest_chat"] = {
+        "user": "[POKE]",
+        "assistant": res.get("message", ""),
+        "emotion": res.get("emotion", "neutral"),
+        "timestamp": time.time(),
+    }
+    return res
 
 
 @app.get("/api/tools")
@@ -241,6 +309,12 @@ async def chat_endpoint(req: ChatRequest):
     if req.reset:
         agent.reset_conversation()
     res = await agent.chat(req.message)
+    workshop_state["latest_chat"] = {
+        "user": req.message,
+        "assistant": res.get("content", ""),
+        "emotion": res.get("emotion", "neutral"),
+        "timestamp": time.time(),
+    }
     return res
 
 

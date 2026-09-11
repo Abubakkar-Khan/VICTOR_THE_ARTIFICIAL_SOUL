@@ -1,7 +1,7 @@
 /* ================================================================
-   Victor // The Artificial Soul
+   Dextex // The Artificial Soul
    Gamified Terminal Client, Dynamic Emotion Theming & Cognitive Audio
-   Version 2.5.0
+   Version 2.7.0
    ================================================================ */
 
 (function () {
@@ -25,6 +25,36 @@
     skeptical: { label: 'SKEPTICAL', sprite: '/static/sprites/skeptical.png', desc: 'Something doesn\'t seem right / checking.' }
   };
 
+  const EMOTION_MOTTOS = {
+    thinking:  'THINK. EXPLORE. SOLVE. REPEAT.',
+    happy:     'IDEAS INTO ACTION.',
+    excited:   'IDEAS INTO ACTION.',
+    curious:   'CURIOSITY BUILDS BETTER ANSWERS.',
+    neutral:   'CURIOSITY BUILDS BETTER ANSWERS.',
+    confused:  'SAME CURIOSITY. BIGGER POSSIBILITIES.',
+    skeptical: 'SAME CURIOSITY. BIGGER POSSIBILITIES.',
+    concerned: 'ANOMALY DETECTED. RECALIBRATING.',
+    eureka:    'INSIGHT UNLOCKED. EUREKA.',
+    listening: 'RECEIVING INPUT VECTOR...',
+    idle:      'CURIOSITY BUILDS BETTER ANSWERS.',
+    bored:     'WAITING FOR NEXT DIRECTIVE.'
+  };
+
+  const MOTTO_LINES = {
+    thinking:  ['THINK.', 'EXPLORE.', 'SOLVE.', 'REPEAT.'],
+    happy:     ['IDEAS', 'INTO', 'ACTION.', ''],
+    excited:   ['IDEAS', 'INTO', 'ACTION.', ''],
+    curious:   ['CURIOSITY', 'BUILDS', 'BETTER', 'ANSWERS.'],
+    neutral:   ['CURIOSITY', 'BUILDS', 'BETTER', 'ANSWERS.'],
+    confused:  ['SAME', 'CURIOSITY.', 'BIGGER', 'POSSIBILITIES.'],
+    skeptical: ['SAME', 'CURIOSITY.', 'BIGGER', 'POSSIBILITIES.'],
+    concerned: ['ANOMALY', 'DETECTED.', 'RECALIBRATING.', ''],
+    eureka:    ['INSIGHT', 'UNLOCKED.', 'EUREKA.', ''],
+    listening: ['RECEIVING', 'INPUT', 'VECTOR...', ''],
+    idle:      ['CURIOSITY', 'BUILDS', 'BETTER', 'ANSWERS.'],
+    bored:     ['WAITING', 'FOR NEXT', 'DIRECTIVE.', '']
+  };
+
 
   // ── Celeste-Style Procedural Audio Synthesizer ─────────────────
   // Electronic pentatonic blips & warm chimes (no robotic TTS)
@@ -33,8 +63,8 @@
     constructor() {
       this.ctx = null;
       this.enabled = true;
-      this.volume = 0.12;
-      this.pentatonic = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
+      this.volume = 0.028; // Soft and sweet, never piercing or jarring
+      this.pentatonic = [783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98, 1760.00]; // High crystal notes
     }
 
     _init() {
@@ -55,30 +85,45 @@
       try {
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
+        const overtone = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
+        const overtoneGain = this.ctx.createGain();
 
         const freq = freqOverride || this.pentatonic[Math.floor(Math.random() * this.pentatonic.length)];
-        osc.type = 'triangle';
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, now);
 
-        gain.gain.setValueAtTime(this.volume, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+        overtone.type = 'sine';
+        overtone.frequency.setValueAtTime(freq * 2, now);
+
+        // Smooth 2ms attack ramp, delicate bell decay
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(this.volume, now + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+
+        overtoneGain.gain.setValueAtTime(0.0001, now);
+        overtoneGain.gain.linearRampToValueAtTime(this.volume * 0.12, now + 0.002);
+        overtoneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.040);
 
         osc.connect(gain);
+        overtone.connect(overtoneGain);
         gain.connect(this.ctx.destination);
+        overtoneGain.connect(this.ctx.destination);
 
         osc.start(now);
-        osc.stop(now + 0.055);
+        overtone.start(now);
+        osc.stop(now + 0.08);
+        overtone.stop(now + 0.08);
       } catch (e) {}
     }
 
-    playSpeechStream(tokenCount = 5) {
+    playSpeechStream(tokenCount = 3) {
       if (!this.enabled) return;
-      const count = Math.min(tokenCount, 8);
+      const count = Math.min(tokenCount, 4);
       for (let i = 0; i < count; i++) {
         setTimeout(() => {
           this.playBlip();
-        }, i * 45);
+        }, i * 48);
       }
     }
 
@@ -88,24 +133,24 @@
       if (!this.ctx) return;
 
       try {
-        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        const notes = [783.99, 1046.50, 1318.51]; // G5, C6, E6 (Gentle ascending Celeste triad)
         notes.forEach((freq, idx) => {
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
-          const start = this.ctx.currentTime + (idx * 0.07);
+          const start = this.ctx.currentTime + (idx * 0.06);
 
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, start);
 
-          gain.gain.setValueAtTime(0, start);
-          gain.gain.linearRampToValueAtTime(this.volume * 0.8, start + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.linearRampToValueAtTime(this.volume * 0.8, start + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
 
           osc.connect(gain);
           gain.connect(this.ctx.destination);
 
           osc.start(start);
-          osc.stop(start + 0.23);
+          osc.stop(start + 0.19);
         });
       } catch (e) {}
     }
@@ -116,26 +161,26 @@
       if (!this.ctx) return;
 
       const cues = {
-        happy: [659.25, 880.00],
-        excited: [587.33, 783.99, 1046.50],
-        eureka: [523.25, 659.25, 783.99, 1046.50],
-        curious: [440.00, 659.25],
-        searching: [440.00, 523.25, 659.25],
-        thinking: [523.25, 659.25],
-        confused: [493.88, 440.00],
-        concerned: [440.00, 392.00],
-        listening: [587.33, 659.25],
-        skeptical: [493.88, 523.25, 466.16],
-        neutral: [523.25],
-        idle: [392.00],
-        bored: [349.23]
+        happy: [1046.50, 1318.51],
+        excited: [1046.50, 1318.51, 1567.98],
+        eureka: [783.99, 1046.50, 1318.51, 1567.98],
+        curious: [880.00, 1174.66],
+        searching: [783.99, 1046.50, 1174.66],
+        thinking: [880.00, 1046.50],
+        confused: [987.77, 880.00],
+        concerned: [783.99, 698.46],
+        listening: [1046.50, 1174.66],
+        skeptical: [987.77, 1046.50, 932.33],
+        neutral: [1046.50],
+        idle: [783.99],
+        bored: [698.46]
       };
 
-      const seq = cues[emotion] || [523.25];
+      const seq = cues[emotion] || [1046.50];
       seq.forEach((freq, idx) => {
         setTimeout(() => {
           this.playBlip(freq);
-        }, idx * 60);
+        }, idx * 55);
       });
     }
   }
@@ -158,6 +203,15 @@
 
   const statusDot = $('#status-dot');
   const statusText = $('#status-text');
+  const mottoText = $('#motto-text');
+  const dexterBgAvatar = $('#dexter-bg-avatar');
+  const statementText = $('#statement-text');
+  const cursorBlock = $('#cursor-block');
+  const userInquiryTrace = $('#user-inquiry-trace');
+  const inquiryText = $('#inquiry-text');
+  const conversationScrollArea = $('#conversation-scroll-area');
+  const dialogueCenterpiece = $('#dialogue-centerpiece');
+
   const victorAvatar = $('#victor-avatar');
   const avatarCard = $('#avatar-card');
   const avatarAura = $('#avatar-aura');
@@ -194,6 +248,8 @@
   const btnLaunchMascot = $('#btn-launch-mascot');
   const toggleAutohide = $('#toggle-autohide');
   const selectCompanionScale = $('#select-companion-scale');
+  const selectClickAction = $('#select-click-action');
+  const selectDialogTheme = $('#select-dialog-theme');
   const shellStatus = $('#shell-status');
 
   const permModal = $('#permission-modal');
@@ -207,6 +263,25 @@
   // ── Dynamic Emotion & UI Theming Engine ────────────────────────
   // Dynamically alters document dataset so all CSS variables shift smoothly
 
+  function updateMotto(emo) {
+    const lines = MOTTO_LINES[emo] || MOTTO_LINES.neutral;
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`motto-line-${i}`);
+      if (el) el.textContent = lines[i - 1] || '';
+    }
+    if (mottoText) {
+      mottoText.textContent = EMOTION_MOTTOS[emo] || 'CURIOSITY BUILDS BETTER ANSWERS.';
+    }
+  }
+
+  function triggerScreenGlitch() {
+    document.body.dataset.glitch = 'true';
+    synth.playBlip(329.63);
+    setTimeout(() => {
+      delete document.body.dataset.glitch;
+    }, 720);
+  }
+
   function setEmotion(name, playCue = true, updatePersonality = false) {
     if (!EMOTIONS[name]) name = 'neutral';
     currentEmotion = name;
@@ -216,7 +291,15 @@
     document.documentElement.dataset.emotion = name;
     document.body.dataset.emotion = name;
 
-    // Smooth sprite transition
+    // Update centered atmospheric background character
+    if (dexterBgAvatar) {
+      dexterBgAvatar.src = data.sprite;
+    }
+
+    // Update dynamic top motto blocks
+    updateMotto(name);
+
+    // Smooth sprite transition for secondary/hidden avatar
     if (victorAvatar) {
       victorAvatar.style.opacity = '0.35';
       setTimeout(() => {
@@ -246,78 +329,166 @@
   }
 
 
-  // ── Dynamic Poke / Click (NO Mechanical Cycling!) ──────────────
-  // Clicking Victor pokes him organically; if idle he wakes up, otherwise reacts in-character
+  // ── Unified Voice Input & Speech-to-Text (Click-to-Listen) ─────
+  let isListeningVoice = false;
+  let speechRecognitionInstance = null;
 
-  function handleAvatarClick() {
+  async function toggleVoiceListening() {
+    if (isListeningVoice) {
+      stopVoiceListening();
+      return;
+    }
+
+    isListeningVoice = true;
+    setEmotion('listening', false);
+    if (btnVoice) btnVoice.classList.add('listening');
+    if (voiceListeningBar) voiceListeningBar.style.display = 'flex';
+    if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = 'Listening... speak naturally';
     synth.playBlip(783.99);
 
-    fetch('/api/poke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.emotion) {
-        setEmotion(data.emotion, true, true);
-        if (data.message) {
-          appendMessage('Victor', data.message);
-          synth.playSpeechStream(4);
-        }
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRec) {
+      try {
+        const recognition = new SpeechRec();
+        speechRecognitionInstance = recognition;
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = `"${transcript}"`;
+          if (event.results[0] && event.results[0].isFinal) {
+            if (chatInput) chatInput.value = transcript.trim();
+            stopVoiceListening();
+            synth.playBlip(1046.50);
+            sendMessage();
+          }
+        };
+
+        recognition.onerror = (e) => {
+          console.warn('Browser SpeechRecognition error, falling back to hardware mic:', e);
+          fallbackBackendListen();
+        };
+
+        recognition.onend = () => {
+          if (isListeningVoice) {
+            stopVoiceListening();
+          }
+        };
+
+        recognition.start();
+        return;
+      } catch (err) {
+        console.warn('Could not start web SpeechRecognition:', err);
       }
-    })
-    .catch(() => {
-      // Offline fallback
-      if (currentEmotion === 'idle') {
-        setEmotion('neutral', true, true);
-        appendMessage('Victor', 'Awake. Neural systems active.');
+    }
+
+    // Fallback in WebView2 or desktop app: record hardware microphone directly via backend
+    await fallbackBackendListen();
+  }
+
+  async function fallbackBackendListen() {
+    if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = 'Recording microphone... speak now';
+    try {
+      const res = await fetch('/api/stt/listen', { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'ok' && data.text && data.text.trim()) {
+        const heard = data.text.trim();
+        if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = `"${heard}"`;
+        if (chatInput) chatInput.value = heard;
+        synth.playBlip(1046.50);
+        setTimeout(() => {
+          stopVoiceListening();
+          sendMessage();
+        }, 350);
       } else {
-        const desc = EMOTIONS[currentEmotion]?.desc || 'Standing by.';
-        appendMessage('Victor', desc);
+        if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = data.message || "Didn't catch that. Click mic to speak.";
+        setTimeout(() => stopVoiceListening(), 1800);
       }
+    } catch (e) {
+      if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = "Mic listener offline. Click mic to retry.";
+      setTimeout(() => stopVoiceListening(), 1800);
+    }
+  }
+
+  function stopVoiceListening() {
+    isListeningVoice = false;
+    if (speechRecognitionInstance) {
+      try { speechRecognitionInstance.stop(); } catch (e) {}
+      speechRecognitionInstance = null;
+    }
+    if (btnVoice) btnVoice.classList.remove('listening');
+    if (voiceListeningBar) voiceListeningBar.style.display = 'none';
+    if (currentEmotion === 'listening') {
+      setEmotion('neutral', false);
+    }
+  }
+
+  if (btnVoice) {
+    btnVoice.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleVoiceListening();
     });
   }
 
   if (avatarCard) {
-    avatarCard.addEventListener('click', handleAvatarClick);
+    avatarCard.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleVoiceListening();
+    });
+  }
+
+  if (dexterBgAvatar) {
+    dexterBgAvatar.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleVoiceListening();
+    });
   }
 
 
-  // ── HUD Navigation & Drawer Overlay ────────────────────────────
+  // ── Fluid Navigation & Drawer Panels ───────────────────────────
 
   function openDrawer(viewName) {
+    if (viewName !== 'chat' && currentView === viewName && hudDrawerOverlay && hudDrawerOverlay.classList.contains('open')) {
+      closeDrawer();
+      return;
+    }
     currentView = viewName;
 
     // Update bottom tabs
-    $$('.hud-nav-tab').forEach(tab => {
+    $$('.nav-tab').forEach(tab => {
       tab.classList.toggle('active', tab.dataset.view === viewName);
     });
 
     if (viewName === 'chat') {
-      hudDrawerOverlay.classList.remove('open');
-      $$('.hud-drawer').forEach(d => d.classList.remove('active'));
-      if (viewTitle) viewTitle.textContent = '[ NEURAL CORE // ONLINE ]';
+      if (hudDrawerOverlay) hudDrawerOverlay.classList.remove('open');
+      $$('.drawer-panel').forEach(d => d.classList.remove('active'));
+      if (viewTitle) viewTitle.textContent = 'DEXTER ONLINE';
       return;
     }
 
     // Open overlay and activate specific drawer panel
-    hudDrawerOverlay.classList.add('open');
-    $$('.hud-drawer').forEach(d => {
+    if (hudDrawerOverlay) hudDrawerOverlay.classList.add('open');
+    $$('.drawer-panel').forEach(d => {
       d.classList.toggle('active', d.id === `view-${viewName}`);
     });
 
     if (viewName === 'tasks') {
-      if (viewTitle) viewTitle.textContent = '[ COGNITIVE TASK PIPELINE ]';
+      if (viewTitle) viewTitle.textContent = 'COGNITIVE TASK PIPELINE';
       loadTasks();
     } else if (viewName === 'memory') {
-      if (viewTitle) viewTitle.textContent = '[ PERSISTENT MEMORY MATRIX ]';
+      if (viewTitle) viewTitle.textContent = 'PERSISTENT MEMORY MATRIX';
       loadMemory();
     } else if (viewName === 'tools') {
-      if (viewTitle) viewTitle.textContent = '[ CONNECTED TOOL REGISTRY ]';
+      if (viewTitle) viewTitle.textContent = 'CONNECTED CAPABILITIES & TOOLS';
       loadTools();
     } else if (viewName === 'settings') {
-      if (viewTitle) viewTitle.textContent = '[ SYSTEM CONFIG & MODELS ]';
+      if (viewTitle) viewTitle.textContent = 'SYSTEM CONFIGURATION & COMPANION';
       loadSettings();
     }
   }
@@ -326,7 +497,7 @@
     openDrawer('chat');
   }
 
-  $$('.hud-nav-tab').forEach(tab => {
+  $$('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       openDrawer(tab.dataset.view);
     });
@@ -436,45 +607,96 @@
   }
 
 
-  // ── Centered Monologue & Chat Rendering ────────────────────────
+  // ── Scrollable Conversation Stream & Statement Rendering ────────
 
-  function hideEmptyState() {
-    if (chatEmpty) chatEmpty.style.display = 'none';
-  }
+  let typewriterTimer = null;
+  let hasConversationStarted = false;
 
-  function appendMessage(sender, text) {
-    hideEmptyState();
-    const msg = document.createElement('div');
-    const isAssistant = sender.toLowerCase() === 'victor';
-    msg.className = `message ${isAssistant ? 'assistant' : 'user'}`;
+  function renderStatementInStream(sender, text) {
+    const clean = stripEmojis(text || '').trim();
+    if (!clean) return;
 
-    if (!isAssistant) {
-      const label = document.createElement('div');
-      label.className = 'message-sender';
-      label.textContent = '[ INQUIRY ]';
-      msg.appendChild(label);
+    // Transition from centered initial statement to scrollable stream
+    if (!hasConversationStarted) {
+      hasConversationStarted = true;
+      if (dialogueCenterpiece) dialogueCenterpiece.style.display = 'none';
+      if (chatFeed) chatFeed.style.display = 'flex';
     }
 
-    const body = document.createElement('div');
-    body.className = 'message-body';
-    body.innerHTML = formatMarkdown(stripEmojis(text));
-    msg.appendChild(body);
+    if (sender === 'You') {
+      const userTurn = document.createElement('div');
+      userTurn.className = 'msg-turn-user';
+      userTurn.innerHTML = `
+        <span class="user-badge">[ YOU ]</span>
+        <div class="user-text">${formatMarkdown(clean)}</div>
+      `;
+      chatFeed.appendChild(userTurn);
+      scrollToBottom();
+      return;
+    }
 
-    chatFeed.appendChild(msg);
+    // Assistant / Dexter turn
+    $$('.msg-turn-dexter.latest-statement').forEach(el => {
+      el.classList.remove('latest-statement');
+      const cur = el.querySelector('.cursor-block');
+      if (cur) cur.remove();
+    });
+
+    const botTurn = document.createElement('div');
+    botTurn.className = 'msg-turn-dexter latest-statement';
+
+    const badge = document.createElement('span');
+    badge.className = 'dexter-badge';
+    badge.textContent = `[ DEXTER // ${currentEmotion.toUpperCase()} ]`;
+    botTurn.appendChild(badge);
+
+    const body = document.createElement('div');
+    body.className = 'dexter-text';
+    botTurn.appendChild(body);
+
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor-block';
+    cursor.innerHTML = '&#9608;';
+    botTurn.appendChild(cursor);
+
+    chatFeed.appendChild(botTurn);
     scrollToBottom();
-    return msg;
+
+    if (typewriterTimer) clearInterval(typewriterTimer);
+    let i = 0;
+    const step = clean.length > 200 ? 4 : (clean.length > 80 ? 2 : 1);
+    const speed = clean.length > 200 ? 8 : (clean.length > 80 ? 14 : 20);
+
+    typewriterTimer = setInterval(() => {
+      if (i >= clean.length) {
+        clearInterval(typewriterTimer);
+        typewriterTimer = null;
+        body.innerHTML = formatMarkdown(clean);
+        return;
+      }
+      body.textContent += clean.slice(i, i + step);
+      i += step;
+      if (i % (step * 8) === 0) {
+        synth.playBlip();
+      }
+      scrollToBottom();
+    }, speed);
   }
 
   function appendThinking() {
-    hideEmptyState();
     removeThinking();
+    if (!hasConversationStarted) {
+      hasConversationStarted = true;
+      if (dialogueCenterpiece) dialogueCenterpiece.style.display = 'none';
+      if (chatFeed) chatFeed.style.display = 'flex';
+    }
 
     const el = document.createElement('div');
-    el.className = 'message assistant thinking';
+    el.className = 'msg-turn-dexter thinking';
     el.id = 'active-thinking-bubble';
 
     const body = document.createElement('div');
-    body.className = 'message-body';
+    body.className = 'dexter-text';
     body.innerHTML = '<span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>';
     el.appendChild(body);
 
@@ -490,15 +712,19 @@
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
-      chatFeed.scrollTop = chatFeed.scrollHeight;
+      if (conversationScrollArea) {
+        conversationScrollArea.scrollTop = conversationScrollArea.scrollHeight;
+      }
     });
   }
 
   // Textarea auto-resize
-  chatInput.addEventListener('input', () => {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-  });
+  if (chatInput) {
+    chatInput.addEventListener('input', () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+    });
+  }
 
 
   // ── Send Message ───────────────────────────────────────────────
@@ -507,7 +733,7 @@
     const text = chatInput.value.trim();
     if (!text) return;
 
-    appendMessage('You', text);
+    renderStatementInStream('You', text);
     chatInput.value = '';
     chatInput.style.height = 'auto';
 
@@ -527,6 +753,7 @@
       .then(handleChatResponse)
       .catch(() => {
         removeThinking();
+        renderStatementInStream('Dexter', 'Connection interrupted. Recalibrating neural core.');
         setEmotion('concerned');
       });
     }
@@ -547,7 +774,20 @@
       chatFeed.innerHTML = '';
       if (chatEmpty) {
         chatFeed.appendChild(chatEmpty);
-        chatEmpty.style.display = '';
+      }
+      chatFeed.style.display = 'none';
+      hasConversationStarted = false;
+      if (dialogueCenterpiece) {
+        dialogueCenterpiece.style.display = 'flex';
+      }
+      if (statementText) {
+        statementText.textContent = 'Ready when you are.';
+      }
+      if (userInquiryTrace) {
+        userInquiryTrace.style.display = 'none';
+      }
+      if (inquiryText) {
+        inquiryText.textContent = '';
       }
       setEmotion('neutral', false);
       fetch('/api/chat', {
@@ -556,108 +796,6 @@
         body: JSON.stringify({ message: '/clear' })
       }).catch(() => {});
     });
-  }
-
-
-  // ── Voice Mode (Speech-to-Text) ───────────────────────────────
-
-  let recognition = null;
-  let isListening = false;
-
-  function initVoice() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      if (btnVoice) {
-        btnVoice.title = 'Speech Recognition requires Chrome, Edge, or an active microphone permission';
-        btnVoice.style.opacity = '0.5';
-      }
-      return;
-    }
-
-    try {
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        isListening = true;
-        if (btnVoice) btnVoice.classList.add('listening');
-        if (voiceListeningBar) {
-          voiceListeningBar.style.display = 'flex';
-          if (voiceTranscriptPreview) {
-            voiceTranscriptPreview.textContent = 'Listening... speak naturally';
-          }
-        }
-        setEmotion('curious', false);
-        synth.playBlip(659.25);
-      };
-
-      recognition.onresult = (event) => {
-        let interim = '';
-        let final = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-        const text = (final || interim).trim();
-        if (text) {
-          if (voiceTranscriptPreview) {
-            voiceTranscriptPreview.textContent = `"${text}"`;
-          }
-          chatInput.value = text;
-          chatInput.style.height = 'auto';
-          chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error);
-        if (voiceTranscriptPreview) {
-          voiceTranscriptPreview.textContent = `Voice status: ${event.error}`;
-        }
-        stopVoice();
-      };
-
-      recognition.onend = () => {
-        stopVoice();
-      };
-
-      if (btnVoice) {
-        btnVoice.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (isListening) {
-            try { recognition.stop(); } catch (err) {}
-            stopVoice();
-          } else {
-            try {
-              recognition.start();
-            } catch (err) {
-              console.warn('Recognition start failed:', err);
-            }
-          }
-        });
-      }
-    } catch (err) {
-      console.warn('Speech recognition initialization error:', err);
-    }
-  }
-
-  function stopVoice() {
-    isListening = false;
-    if (btnVoice) btnVoice.classList.remove('listening');
-    setTimeout(() => {
-      if (!isListening && voiceListeningBar) {
-        voiceListeningBar.style.display = 'none';
-      }
-    }, 1200);
-    if (chatInput.value.trim()) {
-      chatInput.focus();
-      synth.playBlip(880.00);
-    }
   }
 
 
@@ -698,7 +836,7 @@
 
     const text = stripEmojis(data.content || data.response || '');
     if (text) {
-      appendMessage('Victor', text);
+      renderStatementInStream('Dexter', text);
       synth.playSpeechStream(6);
     }
 
@@ -719,7 +857,26 @@
         }
       }
 
+      if (topic === 'agent.glitch') {
+        triggerScreenGlitch();
+        setEmotion('skeptical', true, true);
+      }
+
       if (topic === 'agent.started') {
+        const userMsg = (data.user_message || '').trim();
+        if (userMsg) {
+          if (userInquiryTrace && inquiryText) {
+            inquiryText.textContent = userMsg;
+            userInquiryTrace.style.display = 'flex';
+          }
+          // Check if message is already in feed to prevent duplicate when sent from this web UI
+          const allTurns = chatFeed ? chatFeed.querySelectorAll('.msg-turn-user') : [];
+          const lastTurn = allTurns.length ? allTurns[allTurns.length - 1] : null;
+          const lastText = lastTurn ? lastTurn.textContent : '';
+          if (!lastText.includes(userMsg)) {
+            renderStatementInStream('You', userMsg);
+          }
+        }
         appendThinking();
         synth.playThinkingArpeggio();
       }
@@ -742,6 +899,16 @@
 
       if (topic === 'agent.completed') {
         removeThinking();
+        if (data.content) {
+          const botText = stripEmojis(data.content.trim());
+          const assistantTurns = chatFeed ? chatFeed.querySelectorAll('.msg-turn-dexter') : [];
+          const lastAssistant = assistantTurns.length ? assistantTurns[assistantTurns.length - 1] : null;
+          const lastText = lastAssistant ? lastAssistant.textContent : '';
+          if (!lastText.includes(botText)) {
+            renderStatementInStream('Dexter', botText);
+            synth.playSpeechStream(6);
+          }
+        }
         if (data.emotion) {
           setEmotion(data.emotion, false, true);
         }
@@ -774,7 +941,7 @@
   function renderTasks(tasks) {
     tasksContainer.innerHTML = '';
     if (!tasks.length) {
-      tasksContainer.innerHTML = '<div class="tasks-empty">No active tasks. Victor logs multi-step operations here.</div>';
+      tasksContainer.innerHTML = '<div class="tasks-empty">No active tasks. Dextex logs multi-step operations here.</div>';
       return;
     }
 
@@ -954,6 +1121,12 @@
         if (selectCompanionScale && data.companion_options.scale) {
           selectCompanionScale.value = data.companion_options.scale;
         }
+        if (selectClickAction && data.companion_options.click_action) {
+          selectClickAction.value = data.companion_options.click_action;
+        }
+        if (selectDialogTheme && data.companion_options.dialog_theme) {
+          selectDialogTheme.value = data.companion_options.dialog_theme;
+        }
       }
     } catch (e) {}
 
@@ -1000,6 +1173,32 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scale: scaleVal })
+        });
+      } catch (e) {}
+    });
+  }
+
+  if (selectClickAction) {
+    selectClickAction.addEventListener('change', async () => {
+      const actionVal = selectClickAction.value;
+      try {
+        await fetch('/api/mascot/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ click_action: actionVal })
+        });
+      } catch (e) {}
+    });
+  }
+
+  if (selectDialogTheme) {
+    selectDialogTheme.addEventListener('change', async () => {
+      const themeVal = selectDialogTheme.value;
+      try {
+        await fetch('/api/mascot/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dialog_theme: themeVal })
         });
       } catch (e) {}
     });
@@ -1160,7 +1359,7 @@
 
   function showPermissionModal(data) {
     pendingPermissionId = data.request_id || data.id;
-    permDesc.textContent = data.description || 'Victor requests authorization for an external computer action.';
+    permDesc.textContent = data.description || 'Dextex requests authorization for an external computer action.';
     permDetails.textContent = data.details || data.action || 'system action';
     permModal.classList.add('open');
   }
@@ -1207,6 +1406,9 @@
             }
             if (selectCompanionScale && data.companion_options.scale) {
               selectCompanionScale.value = data.companion_options.scale;
+            }
+            if (selectDialogTheme && data.companion_options.dialog_theme) {
+              selectDialogTheme.value = data.companion_options.dialog_theme;
             }
           }
           break;

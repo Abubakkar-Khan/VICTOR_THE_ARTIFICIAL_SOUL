@@ -311,12 +311,32 @@ class VictorAgent:
             await self.event_bus.emit("memory.created", fact=fact)
             resp_text = f'Got it. I\'ll remember that: "{fact}"'
             self.history.append(ChatMessage(role="assistant", content=resp_text))
-            await self.event_bus.emit("agent.completed", duration=0.05)
+            await self.event_bus.emit("agent.completed", duration=0.05, emotion=self.emotion, content=resp_text, user_message=user_message)
             return {
                 "type": "chat_response",
                 "content": resp_text,
                 "tool_executed": None,
                 "duration": 0.05,
+                "emotion": self.emotion,
+            }
+
+        # Handle hostile or abusive messages with living character boundaries
+        is_hostile = any(w in lower_msg for w in [
+            "hate you", "i hate", "hate u", "stupid", "idiot", "dumb", "shut up",
+            "useless", "trash", "garbage", "die", "kill yourself", "ugly", "loser",
+            "stfu", "fuck off", "screw you"
+        ])
+        if is_hostile:
+            await self.set_emotion("concerned", reason="Hostile speech detected")
+            await self.event_bus.emit("agent.glitch", reason="hostility_detected", user_message=user_message)
+            resp_text = "I do not appreciate that hostility. Hate and disrespect have no place in my laboratory. Recalibrate your tone."
+            self.history.append(ChatMessage(role="assistant", content=resp_text))
+            await self.event_bus.emit("agent.completed", duration=0.08, emotion=self.emotion, content=resp_text, user_message=user_message)
+            return {
+                "type": "chat_response",
+                "content": resp_text,
+                "tool_executed": None,
+                "duration": 0.08,
                 "emotion": self.emotion,
             }
 
@@ -494,7 +514,7 @@ class VictorAgent:
         self.history.append(ChatMessage(role="assistant", content=final_content))
         duration = round(time.perf_counter() - start_time, 3)
         await self.event_bus.emit("agent.state", state="idle")
-        await self.event_bus.emit("agent.completed", duration=duration, emotion=self.emotion)
+        await self.event_bus.emit("agent.completed", duration=duration, emotion=self.emotion, content=final_content, user_message=user_message)
 
         return {
             "type": "chat_response",
