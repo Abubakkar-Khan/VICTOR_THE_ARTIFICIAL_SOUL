@@ -1,10 +1,10 @@
-"""SQLite-based persistent memory system for Victor."""
-
+from contextlib import contextmanager
 import json
 import os
-import sqlite3
-import time
 from pathlib import Path
+import sqlite3
+import sys
+import time
 from typing import Any, Dict, List, Optional
 
 
@@ -13,23 +13,42 @@ class MemoryStore:
 
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            data_dir = Path("data")
+            if getattr(sys, "frozen", False):
+                base_dir = Path(sys.executable).parent
+            else:
+                base_dir = Path(__file__).resolve().parent.parent.parent
+            data_dir = base_dir / "data"
             data_dir.mkdir(parents=True, exist_ok=True)
             self.db_path = str(data_dir / "victor_memory.db")
         else:
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-            self.db_path = db_path
+            p = Path(db_path)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            self.db_path = str(p.resolve())
 
         self._init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+    @contextmanager
+    def _connection(self):
+        """Yield a configured SQLite connection, auto-commit, and guarantee conn.close()."""
+        conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            yield conn
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            conn.close()
 
     def _init_db(self):
         """Create tables for preferences, facts, tasks, and conversations."""
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             # User preferences (e.g., "preferred_video_duration": "< 20m")
             cursor.execute("""
@@ -76,7 +95,7 @@ class MemoryStore:
     # --- Preferences ---
 
     def set_preference(self, key: str, value: str):
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             conn.cursor().execute(
                 "INSERT OR REPLACE INTO preferences (key, value, updated_at) VALUES (?, ?, ?)",
                 (key, value, time.time()),
@@ -84,24 +103,24 @@ class MemoryStore:
             conn.commit()
 
     def get_preference(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             row = conn.cursor().execute("SELECT value FROM preferences WHERE key = ?", (key,)).fetchone()
             return row["value"] if row else default
 
     def list_preferences(self) -> Dict[str, str]:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             rows = conn.cursor().execute("SELECT key, value FROM preferences ORDER BY key ASC").fetchall()
             return {r["key"]: r["value"] for r in rows}
 
     def delete_preference(self, key: str):
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             conn.cursor().execute("DELETE FROM preferences WHERE key = ?", (key,))
             conn.commit()
 
     # --- Long-Term Facts ---
 
     def add_fact(self, fact: str, category: str = "general") -> int:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO facts (fact, category, created_at) VALUES (?, ?, ?)",
@@ -111,7 +130,7 @@ class MemoryStore:
             return cursor.lastrowid
 
     def list_facts(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             cursor = conn.cursor()
             if category:
                 rows = cursor.execute("SELECT * FROM facts WHERE category = ? ORDER BY created_at DESC", (category.lower(),)).fetchall()
@@ -120,13 +139,13 @@ class MemoryStore:
             return [dict(r) for r in rows]
 
     def delete_fact(self, fact_id: int):
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             conn.cursor().execute("DELETE FROM facts WHERE id = ?", (fact_id,))
             conn.commit()
 
     def search_facts(self, query: str) -> List[Dict[str, Any]]:
         """Search remembered facts matching keywords."""
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             pattern = f"%{query.strip().lower()}%"
             rows = conn.cursor().execute(
                 "SELECT * FROM facts WHERE LOWER(fact) LIKE ? OR LOWER(category) LIKE ? ORDER BY created_at DESC",
@@ -137,7 +156,7 @@ class MemoryStore:
     # --- Task Memory ---
 
     def save_task(self, task_id: str, goal: str, steps: List[Dict[str, Any]], outcome: str, duration: float):
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             conn.cursor().execute(
                 """
                 INSERT OR REPLACE INTO task_memory (id, goal, steps_json, outcome, duration, created_at)
@@ -148,7 +167,7 @@ class MemoryStore:
             conn.commit()
 
     def list_tasks(self, limit: int = 50) -> List[Dict[str, Any]]:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             rows = conn.cursor().execute(
                 "SELECT * FROM task_memory ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
@@ -164,7 +183,7 @@ class MemoryStore:
             return result
 
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
-        with self._get_connection() as conn:
+        with self._connection() as conn:
             row = conn.cursor().execute("SELECT * FROM task_memory WHERE id = ?", (task_id,)).fetchone()
             if not row:
                 return None

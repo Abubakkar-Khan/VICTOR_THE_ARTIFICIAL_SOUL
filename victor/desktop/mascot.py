@@ -70,6 +70,12 @@ EMOTION_ACCENTS = {
 PENTATONIC_SCALE = [523, 587, 659, 784, 880, 1046]  # C5, D5, E5, G5, A5, C6
 
 
+def get_server_base() -> str:
+    """Resolve backend API base URL using dynamic port if specified."""
+    port = os.environ.get("VICTOR_PORT", "8000")
+    return f"http://127.0.0.1:{port}"
+
+
 def play_celeste_chime(notes: int = 3, interval: float = 0.05):
     """Play a short, melodic Celeste-style procedural electronic chime."""
     if not HAS_WINSOUND:
@@ -313,7 +319,7 @@ class MascotWindow:
         def _poke():
             try:
                 req = url_request.Request(
-                    "http://127.0.0.1:8000/api/poke",
+                    f"{get_server_base()}/api/poke",
                     data=b"{}",
                     headers={"Content-Type": "application/json"},
                 )
@@ -336,17 +342,19 @@ class MascotWindow:
             try:
                 data = json.dumps({"message": text}).encode("utf-8")
                 req = url_request.Request(
-                    "http://127.0.0.1:8000/api/chat",
+                    f"{get_server_base()}/api/chat",
                     data=data,
                     headers={"Content-Type": "application/json"},
                 )
                 with url_request.urlopen(req, timeout=20) as res:
                     body = json.loads(res.read().decode("utf-8"))
                     content = body.get("content", "")
-                    emo = body.get("emotion", "happy")
-                    self.root.after(0, lambda c=content, e=emo: self.set_emotion(e, c))
-            except Exception:
-                self.root.after(0, lambda: self.set_emotion("concerned", "Connection anomaly."))
+                    emo = body.get("emotion", "neutral")
+                    self.root.after(0, lambda e=emo, m=content: self.set_emotion(e, m))
+                    if self.sound_enabled:
+                        play_celeste_chime(notes=4, interval=0.06)
+            except Exception as ex:
+                self.root.after(0, lambda: self.set_emotion("concerned", "Neural link error."))
         threading.Thread(target=_send, daemon=True).start()
 
     def _start_drag(self, event):
@@ -368,12 +376,15 @@ class MascotWindow:
             self._start_voice_listening()
         self._dragging = False
 
+    def _on_right_click(self, event):
+        self._show_context_menu(event)
+
     def _on_double_click(self, event):
         # Double click opens Workshop
         self._open_workshop()
 
     def _open_workshop(self):
-        webbrowser.open("http://127.0.0.1:8000")
+        webbrowser.open(get_server_base())
 
     def _show_context_menu(self, event):
         self.menu.tk_popup(event.x_root, event.y_root)
@@ -382,7 +393,7 @@ class MascotWindow:
         """Polls server for emotion, telemetry, and auto-hide status."""
         while self.ws_running:
             try:
-                with url_request.urlopen("http://127.0.0.1:8000/api/status", timeout=2) as res:
+                with url_request.urlopen(f"{get_server_base()}/api/status", timeout=2) as res:
                     data = json.loads(res.read().decode("utf-8"))
                     new_emo = data.get("emotion")
                     if new_emo and new_emo != self.emotion and not self.is_listening:

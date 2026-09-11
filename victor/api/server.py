@@ -137,6 +137,16 @@ async def get_status():
     except Exception:
         active_model = agent.config.model.name
 
+    try:
+        facts_count = len(agent.memory.list_facts())
+    except Exception:
+        facts_count = 0
+
+    try:
+        tasks_count = len(agent.tasks.list_all_tasks())
+    except Exception:
+        tasks_count = 0
+
     from victor.core.agent import EMOTIONS
     return {
         "name": agent.config.name,
@@ -149,8 +159,8 @@ async def get_status():
         "tools_count": len(agent.registry.list_tools()),
         "personality": agent.config.personality.model_dump(),
         "security": agent.config.security.model_dump(),
-        "facts_count": len(agent.memory.list_facts()),
-        "tasks_count": len(agent.tasks.list_all_tasks()),
+        "facts_count": facts_count,
+        "tasks_count": tasks_count,
         "workshop_focused": workshop_state["focused"],
         "companion_options": workshop_state["companion_options"],
     }

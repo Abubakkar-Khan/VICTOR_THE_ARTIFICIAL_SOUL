@@ -659,9 +659,14 @@
 
     ws.onopen = () => {
       wsRetryDelay = 1000;
+      if (statusDot) statusDot.className = 'status-dot online';
+      if (statusText && currentEmotion) {
+        statusText.textContent = EMOTIONS[currentEmotion]?.desc || 'Neural Core Online';
+      }
     };
 
     ws.onclose = () => {
+      if (statusDot) statusDot.className = 'status-dot offline';
       setTimeout(initWebSocket, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 1.5, 15000);
     };
@@ -1159,22 +1164,30 @@
   // ── Initialization ─────────────────────────────────────────────
 
   async function init() {
-    try {
-      const res = await fetch('/api/status');
-      const data = await res.json();
-      if (modelName) modelName.textContent = data.model || 'qwen:0.5b';
-      if (data.emotion) {
-        setEmotion(data.emotion, false, true);
-      }
-      if (data.companion_options) {
-        if (toggleAutohide) {
-          toggleAutohide.classList.toggle('on', data.companion_options.auto_hide !== false);
+    let attempts = 6;
+    while (attempts > 0) {
+      try {
+        const res = await fetch('/api/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (modelName) modelName.textContent = data.model || 'qwen:0.5b';
+          if (data.emotion) {
+            setEmotion(data.emotion, false, true);
+          }
+          if (data.companion_options) {
+            if (toggleAutohide) {
+              toggleAutohide.classList.toggle('on', data.companion_options.auto_hide !== false);
+            }
+            if (selectCompanionScale && data.companion_options.scale) {
+              selectCompanionScale.value = data.companion_options.scale;
+            }
+          }
+          break;
         }
-        if (selectCompanionScale && data.companion_options.scale) {
-          selectCompanionScale.value = data.companion_options.scale;
-        }
-      }
-    } catch (e) {}
+      } catch (e) {}
+      attempts--;
+      await new Promise(r => setTimeout(r, 500));
+    }
 
     reportWorkshopFocus(!document.hidden && (document.hasFocus ? document.hasFocus() : true));
     refreshModelsList();
