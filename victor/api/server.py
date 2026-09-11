@@ -129,6 +129,12 @@ async def set_emotion_endpoint(req: EmotionRequest):
     return {"status": "ok", "emotion": agent.emotion}
 
 
+@app.post("/api/poke")
+async def poke_endpoint():
+    """Respond dynamically to user click/poke without mechanical emotion cycling."""
+    return await agent.poke()
+
+
 @app.get("/api/tools")
 async def list_tools():
     return {

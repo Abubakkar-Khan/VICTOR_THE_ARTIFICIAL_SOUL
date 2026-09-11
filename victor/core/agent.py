@@ -86,6 +86,45 @@ class VictorAgent:
                 reason=reason,
             )
 
+    def appraise_initial_emotion(self, text: str) -> str:
+        """Dynamically appraise emotional resonance based on user input sentiment and intent."""
+        lower = text.strip().lower()
+        if any(w in lower for w in ["help", "broken", "fail", "error", "wrong", "cant", "can't", "bug", "issue"]):
+            return "concerned"
+        if any(w in lower for w in ["why", "how", "what", "where", "who", "when", "explore", "search", "check", "?"]):
+            return "curious"
+        if any(w in lower for w in ["awesome", "great", "cool", "wow", "amazing", "eureka", "love"]):
+            return "excited"
+        if any(w in lower for w in ["hello", "hi", "hey", "greetings", "good morning", "good evening"]):
+            return "neutral"
+        return "neutral"
+
+    async def poke(self) -> Dict[str, Any]:
+        """Respond to user poke/click organically without mechanical emotion cycling."""
+        if self.emotion == "idle":
+            await self.set_emotion("neutral", reason="Woken by user poke")
+            msg = "Awake. Neural systems active."
+        elif self.emotion == "thinking":
+            msg = "Synthesizing thoughts. Quiet processing."
+        elif self.emotion == "happy":
+            msg = "Systems operational and optimal."
+        elif self.emotion == "curious":
+            msg = "Listening closely. What do you need?"
+        elif self.emotion == "excited":
+            msg = "Ready for the next inquiry."
+        elif self.emotion == "confused":
+            msg = "Recalibrating semantic vectors."
+        elif self.emotion == "concerned":
+            msg = "Monitoring anomalies. Proceeding with care."
+        else:
+            msg = "Standing by. What would you like to do?"
+
+        return {
+            "status": "ok",
+            "emotion": self.emotion,
+            "message": msg,
+        }
+
     def get_system_prompt(self) -> str:
         """Compile system prompt with tool descriptions, memory context, and emotional state."""
         tool_descriptions = self.registry.format_all_descriptions()
@@ -262,11 +301,9 @@ class VictorAgent:
 
         await self.event_bus.emit("agent.started", mode="chat", user_message=user_message)
         
-        # Initial emotion upon receiving message
-        if any(g in lower_msg for g in ["hello", "hi", "hey", "good morning", "good evening"]):
-            await self.set_emotion("neutral", reason="Greeting")
-        else:
-            await self.set_emotion("curious", reason="Received inquiry")
+        # Dynamically appraise initial emotion from user message context
+        initial_emo = self.appraise_initial_emotion(user_message)
+        await self.set_emotion(initial_emo, reason=f"Dynamic appraisal: {initial_emo}")
             
         await self.event_bus.emit("agent.state", state="thinking")
         self.history.append(ChatMessage(role="user", content=user_message))

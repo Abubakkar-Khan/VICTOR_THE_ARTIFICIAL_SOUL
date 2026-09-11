@@ -151,26 +151,34 @@
       }, duration);
     }
 
-    // Single click: cycle emotions with reaction and sync to backend
+    // Single click: dynamic poke without mechanical emotion cycling
     spriteBox.addEventListener('click', (e) => {
       if (clickTimeout) {
         clearTimeout(clickTimeout);
         clickTimeout = null;
-        // Handled by dblclick
         return;
       }
       clickTimeout = setTimeout(() => {
         clickTimeout = null;
-        const nextIdx = (EMOTION_SEQUENCE.indexOf(currentEmotion) + 1) % EMOTION_SEQUENCE.length;
-        const nextEmo = EMOTION_SEQUENCE[nextIdx];
-        const reaction = EMOTION_REACTIONS[nextEmo] || `Feeling ${nextEmo}`;
-        setEmotion(nextEmo, reaction);
-
-        fetch('http://127.0.0.1:8000/api/emotion', {
+        fetch('http://127.0.0.1:8000/api/poke', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ emotion: nextEmo, reason: 'companion_click' })
-        }).catch(() => {});
+          body: JSON.stringify({})
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.emotion) {
+            setEmotion(data.emotion, data.message || '');
+          }
+        })
+        .catch(() => {
+          if (currentEmotion === 'idle') {
+            setEmotion('neutral', 'Awake. Neural systems active.');
+          } else {
+            const reaction = EMOTION_REACTIONS[currentEmotion] || 'Standing by.';
+            speak(reaction);
+          }
+        });
       }, 220);
     });
 

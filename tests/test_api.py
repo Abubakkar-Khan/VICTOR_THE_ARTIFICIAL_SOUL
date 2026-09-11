@@ -68,3 +68,15 @@ def test_api_models_listing_and_switch():
     switch_data = switch_res.json()
     assert switch_data["status"] == "switched"
     assert switch_data["model"] == "qwen:0.5b"
+
+
+def test_api_poke():
+    # Set to idle, poke should wake Victor up to neutral
+    client.post("/api/emotion", json={"emotion": "idle"})
+    poke_res = client.post("/api/poke")
+    assert poke_res.status_code == 200
+    poke_data = poke_res.json()
+    assert poke_data["status"] == "ok"
+    assert poke_data["emotion"] == "neutral"
+    assert "Awake" in poke_data["message"]
+

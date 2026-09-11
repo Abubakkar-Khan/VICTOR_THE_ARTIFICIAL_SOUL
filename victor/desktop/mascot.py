@@ -281,28 +281,27 @@ class MascotWindow:
 
     def _end_drag(self, event):
         if not self._dragging:
-            # Clicked on Victor! Cycle emotion immediately with sound & personality response
-            try:
-                curr_idx = self.EMOTION_SEQUENCE.index(self.emotion)
-            except ValueError:
-                curr_idx = -1
-            next_emo = self.EMOTION_SEQUENCE[(curr_idx + 1) % len(self.EMOTION_SEQUENCE)]
-            reaction = self.EMOTION_REACTIONS.get(next_emo, f"Feeling {next_emo}.")
-            self.set_emotion(next_emo, reaction)
-
-            # Sync emotion to Workshop backend
-            def _sync():
+            # Clicked on Victor! Dynamic poke without mechanical emotion cycling
+            def _poke():
                 try:
-                    data = json.dumps({"emotion": next_emo, "reason": "mascot_click"}).encode("utf-8")
                     req = url_request.Request(
-                        "http://127.0.0.1:8000/api/emotion",
-                        data=data,
+                        "http://127.0.0.1:8000/api/poke",
+                        data=b"{}",
                         headers={"Content-Type": "application/json"},
                     )
-                    url_request.urlopen(req, timeout=2)
+                    with url_request.urlopen(req, timeout=2) as res:
+                        data = json.loads(res.read().decode("utf-8"))
+                        emo = data.get("emotion", self.emotion)
+                        msg = data.get("message", "Standing by.")
+                        self.root.after(0, lambda e=emo, m=msg: self.set_emotion(e, m))
                 except Exception:
-                    pass
-            threading.Thread(target=_sync, daemon=True).start()
+                    # Offline fallback: dynamic wake up if idle, or dynamic reaction
+                    if self.emotion == "idle":
+                        self.root.after(0, lambda: self.set_emotion("neutral", "Awake. Neural systems active."))
+                    else:
+                        reaction = self.EMOTION_REACTIONS.get(self.emotion, "Standing by.")
+                        self.root.after(0, lambda r=reaction: self.show_speech(r))
+            threading.Thread(target=_poke, daemon=True).start()
         self._dragging = False
 
     def _on_double_click(self, event):

@@ -1,9 +1,7 @@
 /* ================================================================
-   Victor — The Artificial Soul
-   Workshop Client & Cognitive Audio Engine
-   
-   8-Emotion Sprite Integration, Celeste Procedural Sound Synthesis,
-   Real-Time Telemetry & Cognitive Intelligence Loop
+   Victor // The Artificial Soul
+   Gamified Terminal Client, Dynamic Emotion Theming & Cognitive Audio
+   Version 2.5.0
    ================================================================ */
 
 (function () {
@@ -12,26 +10,25 @@
   // ── 8 Artificial Soul Emotions ──────────────────────────────────
 
   const EMOTIONS = {
-    neutral:   { emoji: '😐', label: 'Neutral',   sprite: '/static/sprites/neutral.png',   color: '#E8E4DE', desc: 'Normal interaction' },
-    happy:     { emoji: '😊', label: 'Happy',     sprite: '/static/sprites/happy.png',     color: '#8BA888', desc: 'Successful outcome' },
-    curious:   { emoji: '🤔', label: 'Curious',   sprite: '/static/sprites/curious.png',   color: '#C8956C', desc: 'Exploring & learning' },
-    idle:      { emoji: '😴', label: 'Idle',      sprite: '/static/sprites/idle.png',      color: '#8A8578', desc: 'Resting & standby' },
-    thinking:  { emoji: '🧠', label: 'Thinking',  sprite: '/static/sprites/thinking.png',  color: '#D4A574', desc: 'Processing reasoning' },
-    excited:   { emoji: '😮', label: 'Excited',   sprite: '/static/sprites/excited.png',   color: '#F59E0B', desc: 'Interesting discovery' },
-    confused:  { emoji: '😕', label: 'Confused',  sprite: '/static/sprites/confused.png',  color: '#E07A5F', desc: 'Unclear problem' },
-    concerned: { emoji: '😔', label: 'Concerned', sprite: '/static/sprites/concerned.png', color: '#B85C5C', desc: 'Encountered failure' }
+    neutral:   { emoji: '😐', label: 'NEUTRAL',   sprite: '/static/sprites/neutral.png',   desc: 'Standing by. Calm and level-headed.' },
+    happy:     { emoji: '😊', label: 'HAPPY',     sprite: '/static/sprites/happy.png',     desc: 'Optimal resonance. Systems running cleanly.' },
+    curious:   { emoji: '🤔', label: 'CURIOUS',   sprite: '/static/sprites/curious.png',   desc: 'Observing closely. Exploring telemetry.' },
+    idle:      { emoji: '😴', label: 'IDLE',      sprite: '/static/sprites/idle.png',      desc: 'Deep standby. Drifting quietly.' },
+    thinking:  { emoji: '🧠', label: 'THINKING',  sprite: '/static/sprites/thinking.png',  desc: 'Synthesizing reasoning vectors.' },
+    excited:   { emoji: '😮', label: 'EXCITED',   sprite: '/static/sprites/excited.png',   desc: 'Fascinating discovery! High neural resonance.' },
+    confused:  { emoji: '😕', label: 'CONFUSED',  sprite: '/static/sprites/confused.png',  desc: 'Ambiguous vector. Clarification required.' },
+    concerned: { emoji: '😔', label: 'CONCERNED', sprite: '/static/sprites/concerned.png', desc: 'Anomaly detected. Proceeding with caution.' }
   };
 
 
   // ── Celeste-Style Procedural Audio Synthesizer ─────────────────
-  // No robotic TTS! Pure electronic pentatonic blips & warm chimes.
+  // Electronic pentatonic blips & warm chimes (no robotic TTS)
 
   class CelesteSynthesizer {
     constructor() {
       this.ctx = null;
       this.enabled = true;
       this.volume = 0.12;
-      // Warm pentatonic frequencies (Hz)
       this.pentatonic = [392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
     }
 
@@ -45,7 +42,6 @@
       }
     }
 
-    // Single retro dialogue blip
     playBlip(freqOverride) {
       if (!this.enabled) return;
       this._init();
@@ -71,7 +67,6 @@
       } catch (e) {}
     }
 
-    // Melodic speech burst synchronized with response
     playSpeechStream(tokenCount = 5) {
       if (!this.enabled) return;
       const count = Math.min(tokenCount, 8);
@@ -82,7 +77,6 @@
       }
     }
 
-    // Thinking musical arpeggio
     playThinkingArpeggio() {
       if (!this.enabled) return;
       this._init();
@@ -111,7 +105,6 @@
       } catch (e) {}
     }
 
-    // Emotion-specific sound cue
     playEmotionCue(emotion) {
       if (!this.enabled) return;
       this._init();
@@ -145,10 +138,10 @@
   let ws = null;
   let wsRetryDelay = 1000;
   let currentView = 'chat';
-  let currentEmotion = 'idle';
+  let currentEmotion = 'neutral';
 
 
-  // ── DOM References ─────────────────────────────────────────────
+  // ── DOM Elements ───────────────────────────────────────────────
 
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -157,26 +150,27 @@
   const statusText = $('#status-text');
   const victorAvatar = $('#victor-avatar');
   const avatarCard = $('#avatar-card');
-  const avatarFrame = $('.avatar-frame');
-  const headerMoodTag = $('#header-mood-tag');
+  const avatarAura = $('#avatar-aura');
+  const entityStatusLine = $('#entity-status-line');
   const emotionBadge = $('#emotion-badge');
   const emotionIcon = $('#emotion-icon');
   const emotionName = $('#emotion-name');
-  const cognitiveBadge = $('#cognitive-badge');
+  const viewTitle = $('#view-title');
+  const modelName = $('#model-name');
+  const hudModelPill = $('#hud-model-pill');
   const btnSoundToggle = $('#btn-sound-toggle');
   const soundIndicatorIcon = $('#sound-indicator-icon');
+  const btnClear = $('#btn-clear');
 
-  const modelName = $('#model-name');
-  const viewTitle = $('#view-title');
   const chatFeed = $('#chat-feed');
   const chatEmpty = $('#chat-empty');
   const chatInput = $('#chat-input');
   const btnSend = $('#btn-send');
-  const btnClear = $('#btn-clear');
   const btnVoice = $('#btn-voice');
   const voiceListeningBar = $('#voice-listening-bar');
   const voiceTranscriptPreview = $('#voice-transcript-preview');
 
+  const hudDrawerOverlay = $('#hud-drawer-overlay');
   const tasksContainer = $('#tasks-container');
   const factsList = $('#facts-list');
   const prefsList = $('#prefs-list');
@@ -189,6 +183,7 @@
   const soundToggle = $('#sound-toggle');
   const btnLaunchMascot = $('#btn-launch-mascot');
   const shellStatus = $('#shell-status');
+
   const permModal = $('#permission-modal');
   const permDesc = $('#perm-desc');
   const permDetails = $('#perm-details');
@@ -197,106 +192,164 @@
   const btnPermDeny = $('#btn-perm-deny');
 
 
-  // ── Emotion & Artificial Soul State ─────────────────────────────
-
-  const EMOTION_SEQUENCE = [
-    'neutral',
-    'happy',
-    'curious',
-    'thinking',
-    'excited',
-    'confused',
-    'concerned',
-    'idle'
-  ];
-
-  const EMOTION_REACTIONS = {
-    neutral: 'Standing by. Calm and level-headed.',
-    happy: 'Pleasant state. Systems running cleanly.',
-    curious: 'Observing closely. Noticed something intriguing.',
-    thinking: 'Synthesizing thoughts. Quiet processing.',
-    excited: 'Fascinating discovery! Energy elevated.',
-    confused: 'Puzzling state. Query needs clarity.',
-    concerned: 'Issue detected. Proceeding with caution.',
-    idle: 'Drifting in standby. Ready whenever you are.'
-  };
-
-  const MOOD_TAGS = {
-    neutral: 'Level-headed',
-    happy: 'Pleased',
-    curious: 'Inquisitive',
-    thinking: 'Reflecting',
-    excited: 'Intrigued',
-    confused: 'Puzzled',
-    concerned: 'Careful',
-    idle: 'At rest'
-  };
+  // ── Dynamic Emotion & UI Theming Engine ────────────────────────
+  // Dynamically alters document dataset so all CSS variables shift smoothly
 
   function setEmotion(name, playCue = true, updatePersonality = false) {
     if (!EMOTIONS[name]) name = 'neutral';
     currentEmotion = name;
     const data = EMOTIONS[name];
 
-    // Update sprite with smooth transition
+    // Shift entire HTML / Body Theme Color Variables!
+    document.documentElement.dataset.emotion = name;
+    document.body.dataset.emotion = name;
+
+    // Smooth sprite transition
     if (victorAvatar) {
-      victorAvatar.style.opacity = '0.3';
+      victorAvatar.style.opacity = '0.35';
       setTimeout(() => {
         victorAvatar.src = data.sprite;
         victorAvatar.style.opacity = '1';
       }, 90);
     }
 
-    // Update emotion badge
+    // Telemetry indicators
     if (emotionIcon) emotionIcon.textContent = data.emoji;
     if (emotionName) emotionName.textContent = data.label;
-    if (emotionBadge) {
-      emotionBadge.className = `emotion-badge ${name}`;
+    if (statusText && updatePersonality) {
+      statusText.textContent = data.desc;
+    }
+    if (entityStatusLine) {
+      entityStatusLine.textContent = `SOUL ENGINE // ${data.label}`;
     }
 
-    // Update header mood tag
-    if (headerMoodTag) {
-      headerMoodTag.textContent = MOOD_TAGS[name] || data.label;
-    }
-
-    // Update personality status line
-    if (updatePersonality && statusText && EMOTION_REACTIONS[name]) {
-      statusText.textContent = EMOTION_REACTIONS[name];
-    }
-
-    // Highlight active button in Emotion Studio (Settings)
+    // Emotion Studio buttons in Settings
     $$('.emotion-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.emotion === name);
     });
 
-    // Sound cue
     if (playCue) {
       synth.playEmotionCue(name);
     }
   }
 
-  // Interactive Avatar Click: cycle emotions and play chime
-  function handleAvatarClick() {
-    const nextIdx = (EMOTION_SEQUENCE.indexOf(currentEmotion) + 1) % EMOTION_SEQUENCE.length;
-    const nextEmo = EMOTION_SEQUENCE[nextIdx];
-    setEmotion(nextEmo, true, true);
 
-    // Inform backend so desktop mascot synchronizes
-    fetch('/api/emotion', {
+  // ── Dynamic Poke / Click (NO Mechanical Cycling!) ──────────────
+  // Clicking Victor pokes him organically; if idle he wakes up, otherwise reacts in-character
+
+  function handleAvatarClick() {
+    synth.playBlip(783.99);
+
+    fetch('/api/poke', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emotion: nextEmo, reason: 'user_click' })
-    }).catch(() => {});
+      body: JSON.stringify({})
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.emotion) {
+        setEmotion(data.emotion, true, true);
+        if (data.message) {
+          appendMessage('Victor', data.message);
+          synth.playSpeechStream(4);
+        }
+      }
+    })
+    .catch(() => {
+      // Offline fallback
+      if (currentEmotion === 'idle') {
+        setEmotion('neutral', true, true);
+        appendMessage('Victor', 'Awake. Neural systems active.');
+      } else {
+        const desc = EMOTIONS[currentEmotion]?.desc || 'Standing by.';
+        appendMessage('Victor', desc);
+      }
+    });
   }
 
   if (avatarCard) {
     avatarCard.addEventListener('click', handleAvatarClick);
-  } else if (avatarFrame) {
-    avatarFrame.addEventListener('click', handleAvatarClick);
-  } else if (victorAvatar) {
-    victorAvatar.addEventListener('click', handleAvatarClick);
   }
 
-  // Emotion Studio Buttons
+
+  // ── HUD Navigation & Drawer Overlay ────────────────────────────
+
+  function openDrawer(viewName) {
+    currentView = viewName;
+
+    // Update bottom tabs
+    $$('.hud-nav-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.view === viewName);
+    });
+
+    if (viewName === 'chat') {
+      hudDrawerOverlay.classList.remove('open');
+      $$('.hud-drawer').forEach(d => d.classList.remove('active'));
+      if (viewTitle) viewTitle.textContent = '[ NEURAL CORE // ONLINE ]';
+      return;
+    }
+
+    // Open overlay and activate specific drawer panel
+    hudDrawerOverlay.classList.add('open');
+    $$('.hud-drawer').forEach(d => {
+      d.classList.toggle('active', d.id === `view-${viewName}`);
+    });
+
+    if (viewName === 'tasks') {
+      if (viewTitle) viewTitle.textContent = '[ COGNITIVE TASK PIPELINE ]';
+      loadTasks();
+    } else if (viewName === 'memory') {
+      if (viewTitle) viewTitle.textContent = '[ PERSISTENT MEMORY MATRIX ]';
+      loadMemory();
+    } else if (viewName === 'tools') {
+      if (viewTitle) viewTitle.textContent = '[ CONNECTED TOOL REGISTRY ]';
+      loadTools();
+    } else if (viewName === 'settings') {
+      if (viewTitle) viewTitle.textContent = '[ SYSTEM CONFIG & MODELS ]';
+      loadSettings();
+    }
+  }
+
+  function closeDrawer() {
+    openDrawer('chat');
+  }
+
+  $$('.hud-nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      openDrawer(tab.dataset.view);
+    });
+  });
+
+  $$('[data-close-drawer]').forEach(btn => {
+    btn.addEventListener('click', closeDrawer);
+  });
+
+  // Clicking outside drawer in overlay backdrop closes it
+  if (hudDrawerOverlay) {
+    hudDrawerOverlay.addEventListener('click', (e) => {
+      if (e.target === hudDrawerOverlay) {
+        closeDrawer();
+      }
+    });
+  }
+
+  // Escape key closes drawer
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDrawer();
+    }
+  });
+
+  // Quick model tag in header opens settings
+  if (hudModelPill) {
+    hudModelPill.addEventListener('click', () => {
+      openDrawer('settings');
+    });
+  }
+
+
+  // ── Emotion Studio Buttons (Settings) ──────────────────────────
+
   $$('.emotion-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const emo = btn.dataset.emotion;
@@ -310,77 +363,14 @@
   });
 
 
-  // ── Navigation ─────────────────────────────────────────────────
-
-  const viewNames = {
-    chat: 'Chat',
-    tasks: 'Tasks',
-    memory: 'Memory',
-    tools: 'Tools',
-    settings: 'Settings'
-  };
-
-  function switchView(view) {
-    currentView = view;
-    $$('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
-    $$('.view-panel').forEach(panel => panel.classList.toggle('active', panel.id === `view-${view}`));
-    viewTitle.textContent = viewNames[view] || view;
-
-    if (view === 'tasks') loadTasks();
-    if (view === 'memory') loadMemory();
-    if (view === 'tools') loadTools();
-    if (view === 'settings') loadSettings();
-
-    btnClear.style.display = view === 'chat' ? '' : 'none';
-  }
-
-  $$('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.dataset.view));
-  });
-
-
-  // ── Agent State & Cognitive Loop ───────────────────────────────
-
-  function setAgentState(state, cognitivePhase = '') {
-    statusDot.className = 'status-dot';
-    if (state === 'thinking' || state === 'working') {
-      statusDot.classList.add(state);
-    } else if (state === 'error') {
-      statusDot.classList.add('error');
-    }
-
-    if (state === 'idle' || state === 'done') {
-      statusText.textContent = EMOTION_REACTIONS[currentEmotion] || 'Quietly present';
-    } else if (cognitivePhase) {
-      statusText.textContent = cognitivePhase;
-    } else {
-      statusText.textContent = state + '...';
-    }
-
-    if (cognitiveBadge) {
-      if (cognitivePhase) {
-        cognitiveBadge.textContent = cognitivePhase;
-        cognitiveBadge.classList.add('active');
-      } else if (state === 'thinking') {
-        cognitiveBadge.textContent = 'Reasoning • Synthesizing';
-        cognitiveBadge.classList.add('active');
-      } else if (state === 'working') {
-        cognitiveBadge.textContent = 'Acting • Observing';
-        cognitiveBadge.classList.add('active');
-      } else {
-        cognitiveBadge.textContent = 'Perceive • Act • Reflect';
-        cognitiveBadge.classList.remove('active');
-      }
-    }
-  }
-
-
   // ── Audio Controls ─────────────────────────────────────────────
 
   function toggleSound() {
     synth.enabled = !synth.enabled;
-    const label = synth.enabled ? 'Chimes: On' : 'Chimes: Off';
-    btnSoundToggle.innerHTML = `<span id="sound-indicator-icon">${synth.enabled ? '&#9835;' : '&#10006;'}</span> ${label}`;
+    const label = synth.enabled ? 'CHIMES' : 'MUTED';
+    if (btnSoundToggle) {
+      btnSoundToggle.innerHTML = `<span id="sound-indicator-icon">${synth.enabled ? '&#9835;' : '&#10006;'}</span> ${label}`;
+    }
     if (soundToggle) {
       soundToggle.classList.toggle('on', synth.enabled);
     }
@@ -389,15 +379,11 @@
     }
   }
 
-  if (btnSoundToggle) {
-    btnSoundToggle.addEventListener('click', toggleSound);
-  }
-  if (soundToggle) {
-    soundToggle.addEventListener('click', toggleSound);
-  }
+  if (btnSoundToggle) btnSoundToggle.addEventListener('click', toggleSound);
+  if (soundToggle) soundToggle.addEventListener('click', toggleSound);
 
 
-  // ── Text Utilities ─────────────────────────────────────────────
+  // ── Text Formatting & Sanitation ───────────────────────────────
 
   function escapeHtml(str) {
     const div = document.createElement('div');
@@ -426,7 +412,6 @@
 
     // Links
     html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    html = html.replace(/(^|[\s>])(https?:\/\/[^\s<]+)/gm, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
 
     const paras = html.split(/\n\n+/).filter(p => p.trim());
     if (paras.length > 1) {
@@ -439,7 +424,7 @@
   }
 
 
-  // ── Chat Rendering ─────────────────────────────────────────────
+  // ── Centered Monologue & Chat Rendering ────────────────────────
 
   function hideEmptyState() {
     if (chatEmpty) chatEmpty.style.display = 'none';
@@ -448,51 +433,46 @@
   function appendMessage(sender, text) {
     hideEmptyState();
     const msg = document.createElement('div');
-    msg.className = 'message';
+    const isAssistant = sender.toLowerCase() === 'victor';
+    msg.className = `message ${isAssistant ? 'assistant' : 'user'}`;
 
-    const label = document.createElement('div');
-    label.className = 'message-sender';
-    label.textContent = sender;
+    if (!isAssistant) {
+      const label = document.createElement('div');
+      label.className = 'message-sender';
+      label.textContent = '[ INQUIRY ]';
+      msg.appendChild(label);
+    }
 
     const body = document.createElement('div');
     body.className = 'message-body';
     body.innerHTML = formatMarkdown(stripEmojis(text));
-
-    msg.appendChild(label);
     msg.appendChild(body);
+
     chatFeed.appendChild(msg);
     scrollToBottom();
     return msg;
   }
 
-  function appendToolAnnotation(toolName, status, duration) {
-    hideEmptyState();
-    const ann = document.createElement('div');
-    ann.className = `tool-annotation ${status}`;
-    let text = toolName.replace(/_/g, ' ');
-    if (duration) text += ` \u00B7 ${duration}`;
-    ann.textContent = text;
-    ann.id = `tool-ann-${toolName}-${Date.now()}`;
-    chatFeed.appendChild(ann);
-    scrollToBottom();
-    return ann;
-  }
-
   function appendThinking() {
     hideEmptyState();
-    const prev = chatFeed.querySelector('.thinking-indicator');
-    if (prev) prev.remove();
+    removeThinking();
 
     const el = document.createElement('div');
-    el.className = 'thinking-indicator';
-    el.textContent = 'thinking...';
+    el.className = 'message assistant thinking';
+    el.id = 'active-thinking-bubble';
+
+    const body = document.createElement('div');
+    body.className = 'message-body';
+    body.innerHTML = '<span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>';
+    el.appendChild(body);
+
     chatFeed.appendChild(el);
     scrollToBottom();
     return el;
   }
 
   function removeThinking() {
-    const el = chatFeed.querySelector('.thinking-indicator');
+    const el = $('#active-thinking-bubble');
     if (el) el.remove();
   }
 
@@ -505,7 +485,7 @@
   // Textarea auto-resize
   chatInput.addEventListener('input', () => {
     chatInput.style.height = 'auto';
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
   });
 
 
@@ -519,15 +499,13 @@
     chatInput.value = '';
     chatInput.style.height = 'auto';
 
-    setEmotion('curious', false);
-    setAgentState('thinking', 'Perceiving Directive');
+    setEmotion('thinking', false);
     appendThinking();
     synth.playThinkingArpeggio();
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'chat', message: text }));
     } else {
-      // Fallback to REST
       fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -538,32 +516,35 @@
       .catch(() => {
         removeThinking();
         setEmotion('concerned');
-        setAgentState('idle');
       });
     }
   }
 
-  btnSend.addEventListener('click', sendMessage);
-  chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
+  if (btnSend) btnSend.addEventListener('click', sendMessage);
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  }
 
-  btnClear.addEventListener('click', () => {
-    chatFeed.innerHTML = '';
-    if (chatEmpty) {
-      chatFeed.appendChild(chatEmpty);
-      chatEmpty.style.display = '';
-    }
-    setEmotion('neutral', false);
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '/clear' })
-    }).catch(() => {});
-  });
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      chatFeed.innerHTML = '';
+      if (chatEmpty) {
+        chatFeed.appendChild(chatEmpty);
+        chatEmpty.style.display = '';
+      }
+      setEmotion('neutral', false);
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: '/clear' })
+      }).catch(() => {});
+    });
+  }
 
 
   // ── Voice Mode (Speech-to-Text) ───────────────────────────────
@@ -576,7 +557,7 @@
     if (!SpeechRecognition) {
       if (btnVoice) {
         btnVoice.title = 'Speech Recognition requires Chrome, Edge, or an active microphone permission';
-        btnVoice.style.opacity = '0.55';
+        btnVoice.style.opacity = '0.5';
       }
       return;
     }
@@ -589,14 +570,14 @@
 
       recognition.onstart = () => {
         isListening = true;
-        if (btnVoice) btnVoice.classList.add('recording');
+        if (btnVoice) btnVoice.classList.add('listening');
         if (voiceListeningBar) {
           voiceListeningBar.style.display = 'flex';
           if (voiceTranscriptPreview) {
             voiceTranscriptPreview.textContent = 'Listening... speak naturally';
           }
         }
-        setEmotion('curious', false, false);
+        setEmotion('curious', false);
         synth.playBlip(659.25);
       };
 
@@ -617,7 +598,7 @@
           }
           chatInput.value = text;
           chatInput.style.height = 'auto';
-          chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+          chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
         }
       };
 
@@ -655,7 +636,7 @@
 
   function stopVoice() {
     isListening = false;
-    if (btnVoice) btnVoice.classList.remove('recording');
+    if (btnVoice) btnVoice.classList.remove('listening');
     setTimeout(() => {
       if (!isListening && voiceListeningBar) {
         voiceListeningBar.style.display = 'none';
@@ -668,9 +649,7 @@
   }
 
 
-  // ── WebSocket ──────────────────────────────────────────────────
-
-  let currentToolAnnotation = null;
+  // ── WebSocket Telemetry & Cognitive Events ─────────────────────
 
   function initWebSocket() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -678,11 +657,9 @@
 
     ws.onopen = () => {
       wsRetryDelay = 1000;
-      setAgentState('idle');
     };
 
     ws.onclose = () => {
-      setAgentState('idle');
       setTimeout(initWebSocket, wsRetryDelay);
       wsRetryDelay = Math.min(wsRetryDelay * 1.5, 15000);
     };
@@ -701,7 +678,6 @@
 
   function handleChatResponse(data) {
     removeThinking();
-    setAgentState('idle');
 
     const text = stripEmojis(data.content || data.response || '');
     if (text) {
@@ -715,13 +691,11 @@
   }
 
   function handleServerMessage(msg) {
-    // Normal event or nested event format
     const eventObj = msg.event || msg;
     const topic = eventObj.topic || msg.topic || '';
     const data = eventObj.data || msg.data || {};
 
     if (msg.type === 'event' || topic) {
-
       if (topic === 'agent.emotion') {
         if (data.emotion) {
           setEmotion(data.emotion, true, true);
@@ -729,30 +703,15 @@
       }
 
       if (topic === 'agent.started') {
-        setAgentState('thinking', 'Perceive & Decompose');
         appendThinking();
         synth.playThinkingArpeggio();
       }
 
       if (topic === 'agent.thinking') {
-        setAgentState('thinking', 'Neural Inference');
         setEmotion('thinking', false);
       }
 
-      if (topic === 'tool.started') {
-        removeThinking();
-        setAgentState('working', `Acting: ${data.tool || 'tool'}`);
-        currentToolAnnotation = appendToolAnnotation(data.tool || 'tool', 'active');
-      }
-
       if (topic === 'tool.completed') {
-        if (currentToolAnnotation) {
-          currentToolAnnotation.classList.remove('active');
-          currentToolAnnotation.classList.add('done');
-          const dur = data.duration ? `${data.duration.toFixed(1)}s` : '';
-          if (dur) currentToolAnnotation.textContent += ` \u00B7 ${dur}`;
-          currentToolAnnotation = null;
-        }
         if (['web_search', 'youtube', 'browser'].includes(data.tool)) {
           setEmotion('excited');
         } else {
@@ -761,16 +720,10 @@
       }
 
       if (topic === 'tool.failed') {
-        if (currentToolAnnotation) {
-          currentToolAnnotation.classList.remove('active');
-          currentToolAnnotation.classList.add('failed');
-          currentToolAnnotation = null;
-        }
         setEmotion('concerned');
       }
 
       if (topic === 'agent.completed') {
-        setAgentState('idle');
         removeThinking();
         if (data.emotion) {
           setEmotion(data.emotion, false, true);
@@ -804,70 +757,48 @@
   function renderTasks(tasks) {
     tasksContainer.innerHTML = '';
     if (!tasks.length) {
-      tasksContainer.innerHTML = '<div class="tasks-empty">No tasks yet. Victor creates autonomous task plans during multi-step cognitive loops.</div>';
+      tasksContainer.innerHTML = '<div class="tasks-empty">No active tasks. Victor logs multi-step operations here.</div>';
       return;
     }
 
-    tasks.sort((a, b) => {
-      if (a.status === 'running' && b.status !== 'running') return -1;
-      if (b.status === 'running' && a.status !== 'running') return 1;
-      return 0;
-    });
-
     tasks.forEach(task => {
-      const item = document.createElement('div');
-      item.className = 'task-item';
+      const card = document.createElement('div');
+      card.className = 'task-card';
 
-      const title = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'task-header';
+
+      const title = document.createElement('span');
       title.className = 'task-title';
-      title.textContent = task.goal || task.title || 'Untitled task';
+      title.textContent = task.goal || task.title || 'Autonomous Task';
 
-      const steps = document.createElement('ul');
-      steps.className = 'task-steps';
+      const status = document.createElement('span');
+      status.className = `task-status ${task.status}`;
+      status.textContent = (task.status || 'pending').toUpperCase();
 
-      (task.steps || []).forEach(step => {
-        const li = document.createElement('li');
-        li.className = 'task-step';
+      header.appendChild(title);
+      header.appendChild(status);
+      card.appendChild(header);
 
-        const icon = document.createElement('span');
-        icon.className = 'step-icon';
-        if (step.status === 'completed') {
-          icon.classList.add('done');
-          icon.innerHTML = '&#10003;';
-        } else if (step.status === 'running') {
-          icon.classList.add('active');
-          icon.innerHTML = '&#9679;';
-        } else {
-          icon.classList.add('pending');
-          icon.innerHTML = '&#9675;';
-        }
-
-        const label = document.createElement('span');
-        label.textContent = step.name || step.tool || 'Step';
-
-        li.appendChild(icon);
-        li.appendChild(label);
-        steps.appendChild(li);
-      });
-
-      item.appendChild(title);
-      item.appendChild(steps);
-
-      if (task.status === 'completed' && task.duration) {
-        const dur = document.createElement('div');
-        dur.className = 'task-duration';
-        dur.textContent = `Finished in ${task.duration.toFixed(1)}s`;
-        item.appendChild(dur);
+      if (task.steps && task.steps.length) {
+        const steps = document.createElement('div');
+        steps.className = 'task-steps';
+        task.steps.forEach(step => {
+          const s = document.createElement('div');
+          s.className = 'task-step';
+          s.textContent = `[>] ${step.name || step.tool}`;
+          if (step.duration) {
+            const time = document.createElement('span');
+            time.className = 'step-time';
+            time.textContent = `${step.duration.toFixed(1)}s`;
+            s.appendChild(time);
+          }
+          steps.appendChild(s);
+        });
+        card.appendChild(steps);
       }
 
-      if (task.outcome) {
-        const result = document.createElement('div');
-        result.className = 'task-result';
-        result.textContent = task.outcome;
-        item.appendChild(result);
-      }
-
-      tasksContainer.appendChild(item);
+      tasksContainer.appendChild(card);
     });
   }
 
@@ -889,17 +820,13 @@
       const li = document.createElement('li');
       li.className = 'memory-item';
 
-      const bullet = document.createElement('span');
-      bullet.className = 'memory-bullet';
-      bullet.innerHTML = '&bull;';
-
       const text = document.createElement('span');
-      text.className = 'memory-text';
+      text.className = 'fact-text';
       text.textContent = fact.content || fact.text || fact;
 
       const del = document.createElement('button');
-      del.className = 'memory-delete';
-      del.textContent = 'remove';
+      del.className = 'memory-delete-btn';
+      del.textContent = '[DEL]';
       del.addEventListener('click', async () => {
         const factId = fact.id || fact.fact_id;
         if (factId) {
@@ -908,7 +835,6 @@
         }
       });
 
-      li.appendChild(bullet);
       li.appendChild(text);
       li.appendChild(del);
       factsList.appendChild(li);
@@ -921,44 +847,41 @@
     entries.forEach(entry => {
       const li = document.createElement('li');
       li.className = 'memory-item';
-
-      const bullet = document.createElement('span');
-      bullet.className = 'memory-bullet';
-      bullet.innerHTML = '&bull;';
-
       const text = document.createElement('span');
-      text.className = 'memory-text';
+      text.className = 'fact-text';
       if (Array.isArray(entry)) {
         text.textContent = `${entry[0]}: ${entry[1]}`;
       } else {
         text.textContent = `${entry.key || ''}: ${entry.value || ''}`;
       }
-
-      li.appendChild(bullet);
       li.appendChild(text);
       prefsList.appendChild(li);
     });
   }
 
-  btnAddFact.addEventListener('click', async () => {
-    const text = factInput.value.trim();
-    if (!text) return;
-    await fetch('/api/memory/fact', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text })
+  if (btnAddFact) {
+    btnAddFact.addEventListener('click', async () => {
+      const text = factInput.value.trim();
+      if (!text) return;
+      await fetch('/api/memory/fact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text })
+      });
+      factInput.value = '';
+      loadMemory();
+      setEmotion('happy');
     });
-    factInput.value = '';
-    loadMemory();
-    setEmotion('happy');
-  });
+  }
 
-  factInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      btnAddFact.click();
-    }
-  });
+  if (factInput) {
+    factInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnAddFact.click();
+      }
+    });
+  }
 
 
   // ── Tools ──────────────────────────────────────────────────────
@@ -977,38 +900,33 @@
   function renderTools(tools) {
     toolsList.innerHTML = '';
     tools.forEach(tool => {
-      const row = document.createElement('div');
-      row.className = 'tool-row';
+      const card = document.createElement('div');
+      card.className = 'tool-card';
 
-      const name = document.createElement('span');
+      const name = document.createElement('div');
       name.className = 'tool-name';
-      name.textContent = tool.name;
+      name.textContent = `[ ${tool.name} ]`;
 
-      const desc = document.createElement('span');
+      const desc = document.createElement('div');
       desc.className = 'tool-desc';
       desc.textContent = tool.description || '';
 
-      const perm = document.createElement('span');
-      perm.className = 'tool-perm';
-      const permLevel = (tool.permission || 'safe').toLowerCase();
-      perm.classList.add(permLevel);
-      perm.textContent = permLevel;
-
-      row.appendChild(name);
-      row.appendChild(desc);
-      row.appendChild(perm);
-      toolsList.appendChild(row);
+      card.appendChild(name);
+      card.appendChild(desc);
+      toolsList.appendChild(card);
     });
   }
 
 
-  // ── Settings ───────────────────────────────────────────────────
+  // ── Local Neural Models (Ollama) Switcher ──────────────────────
 
   async function loadSettings() {
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
-      shellStatus.textContent = data.security?.allow_shell ? 'enabled' : 'disabled';
+      if (shellStatus) {
+        shellStatus.textContent = data.security?.allow_shell ? 'ENABLED' : 'DISABLED';
+      }
       if (data.emotion) {
         setEmotion(data.emotion, false);
       }
@@ -1053,62 +971,37 @@
           });
         } else {
           const opt = document.createElement('option');
-          opt.value = current || 'qwen2:1.5b';
-          opt.textContent = current || 'qwen2:1.5b (1.5B)';
+          opt.value = current || 'qwen:0.5b';
+          opt.textContent = current || 'qwen:0.5b (0.5B)';
           modelSelect.appendChild(opt);
         }
       }
 
-      // Update models cards grid
+      // Update model cards grid
       if (modelsGrid) {
         modelsGrid.innerHTML = '';
         const items = detailed.length ? detailed : modelNames.map(n => ({
           name: n,
           label: n,
-          parameter_size: n.includes('0.5') ? '0.5B' : (n.includes('1.5') ? '1.5B' : (n.includes('3') ? '3B' : '')),
-          size_str: '',
-          is_small: n.includes('0.5') || n.includes('1.5') || n.includes('2') || n.includes('3')
+          parameter_size: n.includes('0.5') ? '0.5B' : (n.includes('1.5') ? '1.5B' : (n.includes('3') ? '3B' : ''))
         }));
 
         items.forEach(m => {
-          const card = document.createElement('div');
+          const card = document.createElement('button');
           const isActive = m.name === current;
-          card.className = `model-card${isActive ? ' active' : ''}`;
+          card.className = `model-card-btn${isActive ? ' active' : ''}`;
           card.dataset.model = m.name;
 
-          const header = document.createElement('div');
-          header.className = 'model-card-header';
-
           const title = document.createElement('span');
-          title.className = 'model-card-name';
+          title.className = 'm-name';
           title.textContent = m.name;
 
-          const badge = document.createElement('span');
-          badge.className = 'model-card-badge';
-          badge.textContent = isActive ? 'Active' : 'Downloaded';
+          const tag = document.createElement('span');
+          tag.className = 'm-tag';
+          tag.textContent = isActive ? '[ ACTIVE ]' : (m.parameter_size || '[ LOCAL ]');
 
-          header.appendChild(title);
-          header.appendChild(badge);
-
-          const meta = document.createElement('div');
-          meta.className = 'model-card-meta';
-
-          if (m.parameter_size) {
-            const paramPill = document.createElement('span');
-            paramPill.className = `model-card-pill${m.is_small ? ' small' : ''}`;
-            paramPill.textContent = m.parameter_size;
-            meta.appendChild(paramPill);
-          }
-
-          if (m.size_str) {
-            const sizePill = document.createElement('span');
-            sizePill.className = 'model-card-pill';
-            sizePill.textContent = m.size_str;
-            meta.appendChild(sizePill);
-          }
-
-          card.appendChild(header);
-          card.appendChild(meta);
+          card.appendChild(title);
+          card.appendChild(tag);
 
           card.addEventListener('click', async () => {
             if (m.name === current) return;
@@ -1160,18 +1053,20 @@
     });
   }
 
-  // Launch Desktop Mascot
-  btnLaunchMascot.addEventListener('click', async () => {
-    try {
-      await fetch('/api/mascot/launch', { method: 'POST' });
-      btnLaunchMascot.textContent = 'Launched';
-      synth.playEmotionCue('happy');
-      setTimeout(() => { btnLaunchMascot.textContent = 'Launch'; }, 2000);
-    } catch (e) {}
-  });
+  // Launch Mascot
+  if (btnLaunchMascot) {
+    btnLaunchMascot.addEventListener('click', async () => {
+      try {
+        await fetch('/api/mascot/launch', { method: 'POST' });
+        btnLaunchMascot.textContent = 'COMPANION LAUNCHED';
+        synth.playEmotionCue('happy');
+        setTimeout(() => { btnLaunchMascot.textContent = 'LAUNCH COMPANION'; }, 2000);
+      } catch (e) {}
+    });
+  }
 
 
-  // ── Permission Modal ───────────────────────────────────────────
+  // ── Permissions ────────────────────────────────────────────────
 
   let pendingPermissionId = null;
 
@@ -1179,12 +1074,12 @@
     pendingPermissionId = data.request_id || data.id;
     permDesc.textContent = data.description || 'Victor requests authorization for an external computer action.';
     permDetails.textContent = data.details || data.action || 'system action';
-    permModal.classList.add('visible');
+    permModal.classList.add('open');
   }
 
   async function resolvePermission(decision) {
     if (!pendingPermissionId) return;
-    permModal.classList.remove('visible');
+    permModal.classList.remove('open');
     try {
       await fetch('/api/permissions/respond', {
         method: 'POST',
@@ -1200,9 +1095,9 @@
     pendingPermissionId = null;
   }
 
-  btnPermAllow.addEventListener('click', () => resolvePermission('allow_once'));
-  btnPermAlways.addEventListener('click', () => resolvePermission('always_allow'));
-  btnPermDeny.addEventListener('click', () => resolvePermission('deny'));
+  if (btnPermAllow) btnPermAllow.addEventListener('click', () => resolvePermission('allow_once'));
+  if (btnPermAlways) btnPermAlways.addEventListener('click', () => resolvePermission('always_allow'));
+  if (btnPermDeny) btnPermDeny.addEventListener('click', () => resolvePermission('deny'));
 
 
   // ── Initialization ─────────────────────────────────────────────
@@ -1211,7 +1106,7 @@
     try {
       const res = await fetch('/api/status');
       const data = await res.json();
-      modelName.textContent = data.model || 'qwen2:1.5b';
+      if (modelName) modelName.textContent = data.model || 'qwen:0.5b';
       if (data.emotion) {
         setEmotion(data.emotion, false, true);
       }

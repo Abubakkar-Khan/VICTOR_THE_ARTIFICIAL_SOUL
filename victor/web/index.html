@@ -1,264 +1,316 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-emotion="neutral">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Victor — The Artificial Soul</title>
+  <title>Victor // The Artificial Soul</title>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=2.4.0" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=2.5.0" />
 </head>
-<body>
+<body data-emotion="neutral">
+
+  <!-- CRT Screen Overlay & Corner Brackets -->
+  <div class="crt-overlay"></div>
+  <div class="hud-frame-corners">
+    <div class="corner-bracket top-left"></div>
+    <div class="corner-bracket top-right"></div>
+    <div class="corner-bracket bottom-left"></div>
+    <div class="corner-bracket bottom-right"></div>
+  </div>
 
   <!-- Permission Modal -->
   <div id="permission-modal" class="modal-overlay">
-    <div class="modal-box">
-      <div class="modal-heading">Victor requests authorization</div>
-      <p id="perm-desc" class="modal-text">Please confirm whether to allow this action.</p>
+    <div class="modal-box hud-panel">
+      <div class="modal-heading">[ AUTHORIZATION REQUIRED ]</div>
+      <p id="perm-desc" class="modal-text">Victor is requesting clearance for an autonomous system action.</p>
       <div id="perm-details" class="modal-detail">action details</div>
       <div class="modal-actions">
-        <button id="btn-perm-deny" class="modal-btn danger">Deny</button>
-        <button id="btn-perm-always" class="modal-btn secondary">Always allow</button>
-        <button id="btn-perm-allow" class="modal-btn primary">Allow</button>
+        <button id="btn-perm-deny" class="hud-btn danger">DENY</button>
+        <button id="btn-perm-always" class="hud-btn secondary">ALWAYS ALLOW</button>
+        <button id="btn-perm-allow" class="hud-btn primary">AUTHORIZE</button>
       </div>
     </div>
   </div>
 
-  <div class="app">
+  <div class="terminal-layout">
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- Top HUD Telemetry Bar -->
+    <header class="hud-header">
+      <div class="hud-telemetry-left">
+        <div class="hud-tag brand-tag">
+          <span class="status-pulse-dot" id="status-dot"></span>
+          <span class="hud-title">VICTOR // ARTIFICIAL SOUL</span>
+          <span class="hud-version">v2.5</span>
+        </div>
+        <div class="hud-tag emotion-tag" id="emotion-badge" title="Dynamic Soul Emotion">
+          <span id="emotion-icon">😐</span>
+          <span id="emotion-name">NEUTRAL</span>
+        </div>
+        <span class="hud-subtag" id="status-text">Quietly present</span>
+      </div>
+
+      <div class="hud-telemetry-center">
+        <div class="hud-phase-pill" id="view-title">[ NEURAL CORE // ONLINE ]</div>
+        <span class="header-mood-tag" id="header-mood-tag" style="display:none;">Level-headed</span>
+      </div>
+
+      <div class="hud-telemetry-right">
+        <div class="hud-tag model-tag" id="hud-model-pill" title="Active Model">
+          <span class="dim-label">MODEL //</span>
+          <span id="model-name">qwen:0.5b</span>
+        </div>
+        <button class="hud-btn-pill" id="btn-sound-toggle" title="Toggle Celeste procedural chimes">
+          <span id="sound-indicator-icon">&#9835;</span> CHIMES
+        </button>
+        <button class="hud-btn-pill" id="btn-clear" title="Clear dialogue stream">
+          CLR
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Center Stage: The Entity & Centered Monologue -->
+    <main class="terminal-stage">
       
-      <!-- Victor Pixel Companion Card -->
-      <div class="sidebar-avatar-card" id="avatar-card" title="Click Victor to cycle emotions">
-        <div class="avatar-frame">
-          <img id="victor-avatar" src="/static/sprites/idle.png" alt="Victor" class="avatar-sprite" />
+      <!-- Side Data telemetry bars (decorative game HUD accents) -->
+      <aside class="hud-flank flank-left">
+        <div class="telemetry-grid">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
         </div>
-        <div class="avatar-meta">
-          <div class="brand-row">
-            <span class="brand-name">Victor</span>
-            <span class="status-dot" id="status-dot"></span>
-          </div>
-          <span class="brand-personality-tag" id="status-text">Quietly present</span>
-          <div class="emotion-badge" id="emotion-badge">
-            <span id="emotion-icon">😴</span>
-            <span id="emotion-name">Idle</span>
-          </div>
-        </div>
-      </div>
+        <div class="vertical-label">NEURAL DENSITY // ACTIVE</div>
+      </aside>
 
-      <nav class="sidebar-nav">
-        <button class="nav-item active" data-view="chat">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span>Chat</span>
-        </button>
-        <button class="nav-item" data-view="tasks">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 11l3 3L22 4"/>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-          </svg>
-          <span>Tasks</span>
-        </button>
-        <button class="nav-item" data-view="memory">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-          </svg>
-          <span>Memory</span>
-        </button>
-        <button class="nav-item" data-view="tools">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-          </svg>
-          <span>Tools</span>
-        </button>
-        <button class="nav-item" data-view="settings">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          <span>Settings</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <span class="sidebar-footer-text" id="model-name">qwen2:1.5b</span>
-      </div>
-    </aside>
-
-    <!-- Workspace -->
-    <main class="workspace">
-      <header class="workspace-header">
-        <div class="header-left">
-          <span class="view-title" id="view-title">Chat</span>
-          <span class="header-mood-tag" id="header-mood-tag">Reflective</span>
-        </div>
-        <div class="header-actions">
-          <button class="header-btn" id="btn-sound-toggle" title="Celeste procedural audio chimes">
-            <span id="sound-indicator-icon">&#9835;</span> Chimes
-          </button>
-          <button class="header-btn" id="btn-clear" title="Clear conversation">clear</button>
-        </div>
-      </header>
-
-      <div class="workspace-content">
-
-        <!-- Chat View -->
-        <section id="view-chat" class="view-panel active">
-          <div class="chat-messages" id="chat-feed">
-            <div class="chat-empty" id="chat-empty">
-              <span class="chat-empty-name">Victor</span>
-              <span class="chat-empty-hint">A quiet mind on your desktop. Speaks briefly unless you ask for detail. Click Victor or the microphone below to talk.</span>
+      <!-- Center Hub -->
+      <div class="stage-center-hub">
+        
+        <!-- Victor Floating Entity Core -->
+        <div class="entity-chamber">
+          <div class="avatar-card-container" id="avatar-card" title="Victor — The Artificial Soul">
+            <div class="aura-glow" id="avatar-aura"></div>
+            <div class="avatar-frame">
+              <img id="victor-avatar" src="/static/sprites/neutral.png" alt="Victor" class="avatar-sprite" />
             </div>
           </div>
-          
-          <!-- Elegant Chat Composer with Voice STT -->
-          <div class="chat-composer">
-            <div class="composer-inner">
-              <button class="composer-btn voice-btn" id="btn-voice" title="Voice Mode: Speech to Text (Click to speak)">
-                <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <div class="entity-telemetry-strip">
+            <span class="entity-status-glyph">[</span>
+            <span class="entity-status-text" id="entity-status-line">SOUL ENGINE // MONITORED</span>
+            <span class="entity-status-glyph">]</span>
+          </div>
+        </div>
+
+        <!-- Centered Glowing Dialogue Terminal -->
+        <div class="dialogue-monologue-container">
+          <div class="dialogue-feed" id="chat-feed">
+            <div class="chat-empty" id="chat-empty">
+              <div class="empty-terminal-prompt">&gt; VICTOR NEURAL MATRIX INITIALIZED.</div>
+              <div class="empty-terminal-desc">Standing by. Direct inquiries trigger concise syntheses. Multi-step operations decompose autonomously.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centered Floating Command Prompt -->
+        <div class="hud-input-dock">
+          <div class="hud-prompt-frame">
+            <span class="prompt-caret">&gt;</span>
+            <textarea
+              id="chat-input"
+              class="hud-textarea"
+              placeholder="Query Victor... (concise responses by default)"
+              rows="1"
+            ></textarea>
+            <div class="prompt-controls">
+              <button class="hud-icon-btn voice-btn" id="btn-voice" title="Voice Mode: Speech to Text (Click to talk)">
+                <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                   <line x1="12" y1="19" x2="12" y2="23"/>
                   <line x1="8" y1="23" x2="16" y2="23"/>
                 </svg>
               </button>
-              
-              <textarea
-                id="chat-input"
-                class="composer-input"
-                placeholder="Talk to Victor... (brief answers by default)"
-                rows="1"
-              ></textarea>
-              
-              <button class="composer-btn send-btn" id="btn-send" title="Send message">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"/>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
+              <button class="hud-send-btn" id="btn-send" title="Dispatch inquiry">
+                EXEC
               </button>
             </div>
-            
-            <div class="voice-listening-bar" id="voice-listening-bar" style="display: none;">
-              <span class="voice-pulse-dot"></span>
-              <span id="voice-transcript-preview">Listening... speak naturally</span>
-            </div>
           </div>
-        </section>
 
-        <!-- Tasks View -->
-        <section id="view-tasks" class="view-panel">
+          <div class="voice-listening-bar" id="voice-listening-bar" style="display: none;">
+            <span class="voice-pulse-dot"></span>
+            <span id="voice-transcript-preview">Listening... speak naturally</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Side Flank -->
+      <aside class="hud-flank flank-right">
+        <div class="vertical-label">COGNITIVE FABRIC // SIMULATED</div>
+        <div class="telemetry-grid">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- Bottom HUD Navigation Tabs -->
+    <nav class="hud-bottom-dock">
+      <button class="hud-nav-tab active" data-view="chat">
+        <span class="tab-index">[01]</span>
+        <span class="tab-label">TERMINAL MONOLOGUE</span>
+      </button>
+      <button class="hud-nav-tab" data-view="tasks">
+        <span class="tab-index">[02]</span>
+        <span class="tab-label">COGNITION / TASKS</span>
+      </button>
+      <button class="hud-nav-tab" data-view="memory">
+        <span class="tab-index">[03]</span>
+        <span class="tab-label">MEMORY MATRIX</span>
+      </button>
+      <button class="hud-nav-tab" data-view="tools">
+        <span class="tab-index">[04]</span>
+        <span class="tab-label">TOOL REGISTRY</span>
+      </button>
+      <button class="hud-nav-tab" data-view="settings">
+        <span class="tab-index">[05]</span>
+        <span class="tab-label">SYS CONFIG &amp; MODELS</span>
+      </button>
+    </nav>
+
+    <!-- Overlay HUD Drawers / Panels (Tasks, Memory, Tools, Settings) -->
+    <div id="hud-drawer-overlay" class="hud-drawer-overlay">
+      
+      <!-- Tasks Panel -->
+      <section id="view-tasks" class="view-panel hud-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">[ 02 // COGNITIVE TASK PIPELINE ]</div>
+          <button class="drawer-close-btn" data-close-drawer>[ &times; CLOSE ]</button>
+        </div>
+        <div class="drawer-content">
           <div class="tasks-container" id="tasks-container">
             <div class="tasks-empty" id="tasks-empty">No active tasks. Victor logs multi-step operations here.</div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <!-- Memory View -->
-        <section id="view-memory" class="view-panel">
-          <div class="memory-container">
-            <div class="memory-section">
-              <div class="memory-heading">Memories</div>
-              <ul class="memory-list" id="facts-list"></ul>
-              <div class="memory-add">
-                <input type="text" class="memory-input" id="fact-input" placeholder="Teach Victor something to remember..." />
-                <button class="memory-add-btn" id="btn-add-fact">Remember</button>
-              </div>
-            </div>
-            <div class="memory-section">
-              <div class="memory-section-label">Preferences</div>
-              <ul class="memory-list" id="prefs-list"></ul>
+      <!-- Memory Panel -->
+      <section id="view-memory" class="view-panel hud-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">[ 03 // PERSISTENT MEMORY MATRIX ]</div>
+          <button class="drawer-close-btn" data-close-drawer>[ &times; CLOSE ]</button>
+        </div>
+        <div class="drawer-content memory-container">
+          <div class="memory-section">
+            <div class="memory-heading">PERSISTED KNOWLEDGE &amp; PREFERENCES</div>
+            <ul class="memory-list" id="facts-list"></ul>
+            <div class="memory-add">
+              <input type="text" class="memory-input hud-input" id="fact-input" placeholder="Commit new knowledge vector..." />
+              <button class="hud-btn primary" id="btn-add-fact">COMMIT</button>
             </div>
           </div>
-        </section>
-
-        <!-- Tools View -->
-        <section id="view-tools" class="view-panel">
-          <div class="tools-container">
-            <div class="tools-list" id="tools-list"></div>
+          <div class="memory-section">
+            <div class="memory-section-label">COGNITIVE PREFERENCES</div>
+            <ul class="memory-list" id="prefs-list"></ul>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <!-- Settings View -->
-        <section id="view-settings" class="view-panel">
-          <div class="settings-container">
+      <!-- Tools Panel -->
+      <section id="view-tools" class="view-panel hud-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">[ 04 // CONNECTED CAPABILITIES &amp; TOOLS ]</div>
+          <button class="drawer-close-btn" data-close-drawer>[ &times; CLOSE ]</button>
+        </div>
+        <div class="drawer-content tools-container">
+          <div class="tools-list" id="tools-list"></div>
+        </div>
+      </section>
+
+      <!-- Settings Panel -->
+      <section id="view-settings" class="view-panel hud-drawer">
+        <div class="drawer-header">
+          <div class="drawer-title">[ 05 // SYSTEM CONFIGURATION &amp; LOCAL MODELS ]</div>
+          <button class="drawer-close-btn" data-close-drawer>[ &times; CLOSE ]</button>
+        </div>
+        <div class="drawer-content settings-container">
+
+          <!-- Local Neural Models (Ollama) Switcher -->
+          <div class="settings-section">
+            <div class="settings-header-row">
+              <div class="settings-label">LOCAL NEURAL MODELS (OLLAMA)</div>
+              <button class="settings-refresh-btn hud-btn-pill" id="btn-refresh-models" title="Rescan local Ollama models">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>RESCAN MODELS</span>
+              </button>
+            </div>
+            <p class="settings-hint">Select from downloaded local models in Ollama (0.5B, 1.5B, 2B, 3B, etc.).</p>
             
-            <!-- Emotion Studio -->
-            <div class="settings-section">
-              <div class="settings-label">Emotions &amp; Personality Moods</div>
-              <p class="settings-hint">Click any emotion to preview Victor's sprite reaction and audio chime.</p>
-              <div class="emotion-studio-grid" id="emotion-studio-grid">
-                <button class="emotion-btn" data-emotion="neutral"><span>😐</span> Neutral</button>
-                <button class="emotion-btn" data-emotion="happy"><span>😊</span> Happy</button>
-                <button class="emotion-btn" data-emotion="curious"><span>🤔</span> Curious</button>
-                <button class="emotion-btn" data-emotion="idle"><span>😴</span> Idle</button>
-                <button class="emotion-btn" data-emotion="thinking"><span>🧠</span> Thinking</button>
-                <button class="emotion-btn" data-emotion="excited"><span>😮</span> Excited</button>
-                <button class="emotion-btn" data-emotion="confused"><span>😕</span> Confused</button>
-                <button class="emotion-btn" data-emotion="concerned"><span>😔</span> Concerned</button>
-              </div>
+            <div class="settings-row">
+              <span>ACTIVE MODEL</span>
+              <select class="settings-select hud-select" id="model-select"></select>
             </div>
 
-            <div class="settings-section">
-              <div class="settings-label">Voice &amp; Audio</div>
-              <div class="settings-row">
-                <span>Celeste Sound Chimes</span>
-                <div class="settings-toggle on" id="sound-toggle"></div>
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-header-row">
-                <div class="settings-label">Local Neural Models (Ollama)</div>
-                <button class="settings-refresh-btn" id="btn-refresh-models" title="Rescan installed Ollama models">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                  </svg>
-                  <span>Rescan</span>
-                </button>
-              </div>
-              <p class="settings-hint">Select from downloaded local models in Ollama (e.g. 0.5B, 1.5B, 2B, 3B).</p>
-              
-              <div class="settings-row">
-                <span>Active Model</span>
-                <select class="settings-select" id="model-select"></select>
-              </div>
-
-              <div class="models-grid" id="models-grid"></div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-label">Desktop Mascot</div>
-              <div class="settings-row">
-                <span>Launch Desktop Companion</span>
-                <button class="settings-btn" id="btn-launch-mascot">Launch</button>
-              </div>
-            </div>
-
-            <div class="settings-section">
-              <div class="settings-label">Security &amp; Boundaries</div>
-              <div class="settings-row">
-                <span>Terminal shell access</span>
-                <span class="settings-value" id="shell-status">disabled</span>
-              </div>
-            </div>
-
+            <div class="models-grid" id="models-grid"></div>
           </div>
-        </section>
 
-      </div>
-    </main>
+          <!-- Emotion Studio -->
+          <div class="settings-section">
+            <div class="settings-label">ARTIFICIAL SOUL EMOTIONS &amp; THEME PREVIEWS</div>
+            <p class="settings-hint">Preview how Victor shifts the entire UI color palette and Celeste chimes.</p>
+            <div class="emotion-studio-grid" id="emotion-studio-grid">
+              <button class="emotion-btn" data-emotion="neutral"><span>😐</span> Neutral</button>
+              <button class="emotion-btn" data-emotion="happy"><span>😊</span> Happy</button>
+              <button class="emotion-btn" data-emotion="curious"><span>🤔</span> Curious</button>
+              <button class="emotion-btn" data-emotion="idle"><span>😴</span> Idle</button>
+              <button class="emotion-btn" data-emotion="thinking"><span>🧠</span> Thinking</button>
+              <button class="emotion-btn" data-emotion="excited"><span>😮</span> Excited</button>
+              <button class="emotion-btn" data-emotion="confused"><span>😕</span> Confused</button>
+              <button class="emotion-btn" data-emotion="concerned"><span>😔</span> Concerned</button>
+            </div>
+          </div>
+
+          <!-- Audio & Celeste Chimes -->
+          <div class="settings-section">
+            <div class="settings-label">AUDIO FEEDBACK</div>
+            <div class="settings-row">
+              <span>Celeste Procedural Sound Chimes</span>
+              <div class="settings-toggle on" id="sound-toggle"></div>
+            </div>
+          </div>
+
+          <!-- Desktop Mascot -->
+          <div class="settings-section">
+            <div class="settings-label">DESKTOP MASCOT</div>
+            <div class="settings-row">
+              <span>Launch Desktop Pixel Mascot</span>
+              <button class="hud-btn secondary" id="btn-launch-mascot">LAUNCH COMPANION</button>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="settings-section">
+            <div class="settings-label">SECURITY &amp; SYSTEM BOUNDARIES</div>
+            <div class="settings-row">
+              <span>Terminal Shell Execution</span>
+              <span class="settings-value" id="shell-status">DISABLED</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
 
   </div>
 
-  <script src="/static/app.js?v=2.4.0"></script>
+  <script src="/static/app.js?v=2.5.0"></script>
 </body>
 </html>
