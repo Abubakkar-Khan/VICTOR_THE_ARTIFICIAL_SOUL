@@ -4,12 +4,6 @@ echo ========================================
 echo   Victor — The Artificial Soul
 echo ========================================
 
-if exist "dist\Victor\Victor.exe" (
-    echo Launching compiled Victor binary: dist\Victor\Victor.exe ...
-    start "" "dist\Victor\Victor.exe"
-    exit /b 0
-)
-
 netstat -ano | findstr :8000 | findstr LISTENING >nul 2>&1
 if %errorlevel% neq 0 (
     echo [1/3] Starting Victor API server on port 8000...

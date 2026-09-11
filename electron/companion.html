@@ -106,25 +106,44 @@
       concerned: '../victor/sprite/concerned_240.png'
     };
 
+    const EMOTION_SEQUENCE = [
+      'neutral', 'happy', 'curious', 'thinking', 'excited', 'confused', 'concerned', 'idle'
+    ];
+
+    const EMOTION_REACTIONS = {
+      neutral:   "Standing by. Calm and level-headed.",
+      happy:     "Pleasant state. Systems running cleanly.",
+      curious:   "Observing closely. Noticed something intriguing.",
+      thinking:  "Synthesizing thoughts. Quiet processing.",
+      excited:   "Fascinating discovery! Energy elevated.",
+      confused:  "Puzzling state. Query needs clarity.",
+      concerned: "Issue detected. Proceeding with caution.",
+      idle:      "Drifting in standby. Ready whenever you are."
+    };
+
     const spriteImg = document.getElementById('sprite-img');
     const speechBubble = document.getElementById('speech-bubble');
     const chatInput = document.getElementById('chat-input');
     const spriteBox = document.getElementById('sprite-box');
 
     let currentEmotion = 'idle';
+    let clickTimeout = null;
 
-    function setEmotion(name) {
+    function setEmotion(name, speech = '') {
       if (EMOTIONS[name]) {
         currentEmotion = name;
         spriteImg.style.opacity = '0.3';
         setTimeout(() => {
           spriteImg.src = EMOTIONS[name];
           spriteImg.style.opacity = '1';
-        }, 100);
+        }, 90);
+      }
+      if (speech) {
+        speak(speech);
       }
     }
 
-    function speak(text, duration = 4000) {
+    function speak(text, duration = 3500) {
       speechBubble.textContent = text;
       speechBubble.style.display = 'block';
       setTimeout(() => {
@@ -132,7 +151,35 @@
       }, duration);
     }
 
-    spriteBox.addEventListener('click', () => {
+    // Single click: cycle emotions with reaction and sync to backend
+    spriteBox.addEventListener('click', (e) => {
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        clickTimeout = null;
+        // Handled by dblclick
+        return;
+      }
+      clickTimeout = setTimeout(() => {
+        clickTimeout = null;
+        const nextIdx = (EMOTION_SEQUENCE.indexOf(currentEmotion) + 1) % EMOTION_SEQUENCE.length;
+        const nextEmo = EMOTION_SEQUENCE[nextIdx];
+        const reaction = EMOTION_REACTIONS[nextEmo] || `Feeling ${nextEmo}`;
+        setEmotion(nextEmo, reaction);
+
+        fetch('http://127.0.0.1:8000/api/emotion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emotion: nextEmo, reason: 'companion_click' })
+        }).catch(() => {});
+      }, 220);
+    });
+
+    // Double click: open chat input
+    spriteBox.addEventListener('dblclick', (e) => {
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        clickTimeout = null;
+      }
       chatInput.style.display = 'block';
       chatInput.focus();
     });
@@ -143,8 +190,7 @@
         chatInput.value = '';
         chatInput.style.display = 'none';
         if (text) {
-          setEmotion('thinking');
-          speak('Thinking...');
+          setEmotion('thinking', 'Thinking...');
           try {
             const res = await fetch('http://127.0.0.1:8000/api/chat', {
               method: 'POST',
@@ -155,18 +201,12 @@
             if (data.emotion) setEmotion(data.emotion);
             speak(data.content || 'Got it.');
           } catch (err) {
-            setEmotion('concerned');
-            speak('Could not connect to server.');
+            setEmotion('concerned', 'Could not connect to server.');
           }
         }
       } else if (e.key === 'Escape') {
         chatInput.style.display = 'none';
       }
-    });
-
-    // Double click to open Workshop
-    spriteBox.addEventListener('dblclick', () => {
-      window.open('http://127.0.0.1:8000', '_blank');
     });
 
     // Polling backend for status updates
@@ -178,7 +218,7 @@
           setEmotion(data.emotion);
         }
       } catch (e) {}
-    }, 2000);
+    }, 1500);
   </script>
 </body>
 </html>

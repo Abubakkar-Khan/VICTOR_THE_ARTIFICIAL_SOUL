@@ -1217,6 +1217,7 @@
       }
     } catch (e) {}
 
+    refreshModelsList();
     initVoice();
     initWebSocket();
   }
