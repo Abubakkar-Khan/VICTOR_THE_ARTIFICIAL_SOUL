@@ -58,6 +58,9 @@ class VictorBuilder:
             ("pydantic", "Pydantic"),
             ("PIL", "Pillow"),
             ("yaml", "PyYAML"),
+            ("webview", "PyWebView"),
+            ("sounddevice", "SoundDevice"),
+            ("speech_recognition", "SpeechRecognition"),
             ("PyInstaller", "PyInstaller"),
         ]
 

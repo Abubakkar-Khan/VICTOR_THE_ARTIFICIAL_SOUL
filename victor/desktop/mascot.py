@@ -1,5 +1,15 @@
-"""Victor Desktop Companion — Pixel-Art Embodiment of the Artificial Soul."""
+"""Victor Desktop Companion — Pixel-Art Embodiment of the Artificial Soul.
 
+Features:
+- Seamless desktop presence: auto-hides when Workshop is in focus, auto-appears when minimized
+- Animated circular/pill speech bubble with emotional accent borders
+- Click-to-listen: microphone capture via sounddevice + speech_recognition (zero typing box)
+- Real-time 1:1 emotional synchronization with Workshop
+- Zero emojis across all UI, menus, and feedback
+- Procedural Celeste-style melodic chimes
+"""
+
+import io
 import json
 import math
 import os
@@ -24,16 +34,37 @@ try:
 except ImportError:
     HAS_WINSOUND = False
 
+try:
+    import sounddevice as sd
+    from scipy.io import wavfile
+    import speech_recognition as sr
+    HAS_AUDIO = True
+except ImportError:
+    HAS_AUDIO = False
+
+
+# ── 8 Artificial Soul Emotions (Zero Emojis) ───────────────────────
 
 EMOTIONS = {
-    "neutral": {"emoji": "😐", "label": "Neutral", "desc": "Normal interaction"},
-    "happy": {"emoji": "😊", "label": "Happy", "desc": "Successful/helpful outcome"},
-    "curious": {"emoji": "🤔", "label": "Curious", "desc": "Exploring/learning"},
-    "idle": {"emoji": "😴", "label": "Idle", "desc": "Nothing happening"},
-    "thinking": {"emoji": "🧠", "label": "Thinking", "desc": "Processing"},
-    "excited": {"emoji": "😮", "label": "Excited", "desc": "Interesting discovery"},
-    "confused": {"emoji": "😕", "label": "Confused", "desc": "Unclear request/problem"},
-    "concerned": {"emoji": "😔", "label": "Concerned", "desc": "Failure/problem"},
+    "neutral":   {"label": "Neutral",   "desc": "Standing by. Calm and level-headed."},
+    "happy":     {"label": "Happy",     "desc": "Optimal resonance. Systems running cleanly."},
+    "curious":   {"label": "Curious",   "desc": "Observing closely. Exploring telemetry."},
+    "idle":      {"label": "Idle",      "desc": "Deep standby. Drifting quietly."},
+    "thinking":  {"label": "Thinking",  "desc": "Synthesizing reasoning vectors."},
+    "excited":   {"label": "Excited",   "desc": "Fascinating discovery! High neural resonance."},
+    "confused":  {"label": "Confused",  "desc": "Ambiguous vector. Clarification required."},
+    "concerned": {"label": "Concerned", "desc": "Anomaly detected. Proceeding with caution."},
+}
+
+EMOTION_ACCENTS = {
+    "neutral":   "#D4A574",
+    "happy":     "#10B981",
+    "curious":   "#F59E0B",
+    "thinking":  "#38BDF8",
+    "excited":   "#FBBF24",
+    "confused":  "#C084FC",
+    "concerned": "#EF4444",
+    "idle":      "#64748B",
 }
 
 PENTATONIC_SCALE = [523, 587, 659, 784, 880, 1046]  # C5, D5, E5, G5, A5, C6
@@ -98,8 +129,10 @@ class MascotWindow:
         self.drag_x = 0
         self.drag_y = 0
         self._dragging = False
-        self.input_active = False
         self.sound_enabled = True
+        self.is_listening = False
+        self._is_hidden = False
+        self.auto_hide_enabled = True
 
         # Sprite cache
         self.sprites = {}
@@ -110,33 +143,20 @@ class MascotWindow:
             except Exception:
                 pass
 
-        # Chat Entry Setup
-        self.chat_entry = tk.Entry(
-            self.root,
-            font=("Segoe UI", 9),
-            bg="#201F1B",
-            fg="#E8E4DE",
-            insertbackground="#E8E4DE",
-            relief="solid",
-            bd=1,
-        )
-        self.chat_entry.bind("<Return>", self._send_chat)
-        self.chat_entry.bind("<Escape>", lambda e: self._hide_input_bubble())
-
-        # Context Menu
-        self._setup_context_menu()
-
-        # Mouse Bindings
-        self.canvas.bind("<Button-1>", self._on_single_click)
+        # Event bindings
+        self.canvas.bind("<Button-1>", self._start_drag)
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._end_drag)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Button-3>", self._show_context_menu)
 
-        # Polling & WebSocket telemetry thread
+        # Context Menu
+        self._setup_context_menu()
+
+        # Telemetry & Polling Thread
         self.ws_running = True
-        self.ws_thread = threading.Thread(target=self._ws_telemetry, daemon=True)
-        self.ws_thread.start()
+        self.telemetry_thread = threading.Thread(target=self._ws_telemetry, daemon=True)
+        self.telemetry_thread.start()
 
         # Start animation loop
         self._animate()
@@ -162,7 +182,6 @@ class MascotWindow:
             if path.exists():
                 try:
                     img = Image.open(path).convert("RGBA")
-                    # Resize to fit companion canvas
                     resized = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
                     self.sprites[emo] = ImageTk.PhotoImage(resized)
                 except Exception as e:
@@ -172,39 +191,55 @@ class MascotWindow:
         self.menu = tk.Menu(
             self.root,
             tearoff=0,
-            bg="#181815",
-            fg="#E8E4DE",
-            activebackground="#2A2924",
+            bg="#111215",
+            fg="#E6E6E6",
+            activebackground="#202226",
             activeforeground="#D4A574",
             font=("Segoe UI", 9),
+            relief="flat",
+            bd=1,
         )
-        self.menu.add_command(label="Talk to Victor...", command=self.show_input_bubble)
+        self.menu.add_command(label="Listen (Microphone)", command=self._start_voice_listening)
         self.menu.add_command(label="Open Workshop", command=self._open_workshop)
-        
-        # Emotions Submenu
+        self.menu.add_separator()
+
+        # Emotions Submenu (Strictly zero emojis)
         emo_menu = tk.Menu(
             self.menu,
             tearoff=0,
-            bg="#181815",
-            fg="#E8E4DE",
-            activebackground="#2A2924",
+            bg="#111215",
+            fg="#E6E6E6",
+            activebackground="#202226",
             activeforeground="#D4A574",
             font=("Segoe UI", 9),
+            relief="flat",
         )
         for key, info in EMOTIONS.items():
             emo_menu.add_command(
-                label=f"{info['emoji']} {info['label']} — {info['desc']}",
-                command=lambda k=key: self.set_emotion(k, f"Feeling {k}"),
+                label=f"[{info['label'].upper()}] — {info['desc']}",
+                command=lambda k=key: self.set_emotion(k, f"Reflecting {k}"),
             )
         self.menu.add_cascade(label="Emotions", menu=emo_menu)
         self.menu.add_separator()
-        self.menu.add_command(label="Mute Sounds" if self.sound_enabled else "Enable Sounds", command=self._toggle_sound)
-        self.menu.add_command(label="Sleep / Idle", command=lambda: self.set_emotion("idle", "Resting..."))
+        self.menu.add_command(
+            label="Mute Sounds" if self.sound_enabled else "Enable Sounds",
+            command=self._toggle_sound,
+        )
+        self.menu.add_command(
+            label="Auto-Hide When Workshop Active: " + ("ON" if self.auto_hide_enabled else "OFF"),
+            command=self._toggle_auto_hide,
+        )
+        self.menu.add_command(label="Sleep / Standby", command=lambda: self.set_emotion("idle", "Standby mode."))
         self.menu.add_command(label="Quit", command=self.root.destroy)
 
     def _toggle_sound(self):
         self.sound_enabled = not self.sound_enabled
         self.show_speech("Sounds muted." if not self.sound_enabled else "Sounds enabled.")
+        self._setup_context_menu()
+
+    def _toggle_auto_hide(self):
+        self.auto_hide_enabled = not self.auto_hide_enabled
+        self.show_speech(f"Auto-hide is now {'ON' if self.auto_hide_enabled else 'OFF'}.")
         self._setup_context_menu()
 
     def set_emotion(self, emotion: str, speech: str = ""):
@@ -217,33 +252,86 @@ class MascotWindow:
             if self.sound_enabled:
                 play_celeste_chime(notes=2, interval=0.08)
 
-    def show_speech(self, text: str, duration: float = 4.0):
-        """Display a speech bubble above Victor's portrait."""
-        self.speech_text = text[:90] + ("..." if len(text) > 90 else "")
+    def show_speech(self, text: str, duration: float = 4.2):
+        """Display a smooth circular/pill speech bubble above Victor's portrait."""
+        self.speech_text = text[:85] + ("..." if len(text) > 85 else "")
         self.speech_expires = time.time() + duration
         if self.sound_enabled:
             play_celeste_chime(notes=3, interval=0.04)
 
-    def show_input_bubble(self):
-        """Show the quick chat text entry above Victor's head."""
-        self.chat_entry.place(x=20, y=10, width=200, height=26)
-        self.chat_entry.focus_set()
-        self.input_active = True
-
-    def _hide_input_bubble(self):
-        self.chat_entry.delete(0, tk.END)
-        self.chat_entry.place_forget()
-        self.input_active = False
-
-    def _send_chat(self, event):
-        text = self.chat_entry.get().strip()
-        self._hide_input_bubble()
-        if not text:
+    def _start_voice_listening(self):
+        """Click-to-listen: local microphone speech-to-text without text input boxes."""
+        if self.is_listening:
             return
 
-        self.set_emotion("thinking", "Thinking...")
-        
-        # Dispatch to backend in background thread
+        self.is_listening = True
+        self.show_speech("Listening...", duration=6.0)
+        if self.sound_enabled:
+            play_celeste_chime(notes=2, interval=0.06)
+
+        def _worker():
+            try:
+                if not HAS_AUDIO:
+                    self.root.after(0, lambda: self._on_poke_fallback())
+                    return
+
+                fs = 16000
+                duration = 3.8
+                recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype="int16")
+                sd.wait()
+
+                # Check if audio has energy
+                import numpy as np
+                peak = np.max(np.abs(recording))
+                if peak < 400:
+                    # Low volume / silence: gentle poke fallback
+                    self.root.after(0, lambda: self._on_poke_fallback())
+                    return
+
+                wav_io = io.BytesIO()
+                wavfile.write(wav_io, fs, recording)
+                wav_io.seek(0)
+
+                recognizer = sr.Recognizer()
+                with sr.AudioFile(wav_io) as source:
+                    audio = recognizer.record(source)
+                    text = recognizer.recognize_google(audio)
+
+                if text and text.strip():
+                    self.root.after(0, lambda t=text: self._dispatch_chat(t))
+                else:
+                    self.root.after(0, lambda: self._on_poke_fallback())
+            except Exception:
+                self.root.after(0, lambda: self._on_poke_fallback())
+            finally:
+                self.is_listening = False
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_poke_fallback(self):
+        """Dynamic poke when no voice was captured."""
+        def _poke():
+            try:
+                req = url_request.Request(
+                    "http://127.0.0.1:8000/api/poke",
+                    data=b"{}",
+                    headers={"Content-Type": "application/json"},
+                )
+                with url_request.urlopen(req, timeout=2) as res:
+                    data = json.loads(res.read().decode("utf-8"))
+                    emo = data.get("emotion", self.emotion)
+                    msg = data.get("message", "Standing by.")
+                    self.root.after(0, lambda e=emo, m=msg: self.set_emotion(e, m))
+            except Exception:
+                if self.emotion == "idle":
+                    self.root.after(0, lambda: self.set_emotion("neutral", "Awake. Systems active."))
+                else:
+                    self.root.after(0, lambda: self.show_speech("Standing by."))
+        threading.Thread(target=_poke, daemon=True).start()
+
+    def _dispatch_chat(self, text: str):
+        """Send recognized voice prompt to Victor's backend."""
+        self.set_emotion("thinking", "Processing...")
         def _send():
             try:
                 data = json.dumps({"message": text}).encode("utf-8")
@@ -252,29 +340,16 @@ class MascotWindow:
                     data=data,
                     headers={"Content-Type": "application/json"},
                 )
-                with url_request.urlopen(req, timeout=15) as res:
+                with url_request.urlopen(req, timeout=20) as res:
                     body = json.loads(res.read().decode("utf-8"))
                     content = body.get("content", "")
                     emo = body.get("emotion", "happy")
-                    self.root.after(0, lambda: self.set_emotion(emo, content))
-            except Exception as e:
-                self.root.after(0, lambda: self.set_emotion("concerned", "Could not reach server."))
-
+                    self.root.after(0, lambda c=content, e=emo: self.set_emotion(e, c))
+            except Exception:
+                self.root.after(0, lambda: self.set_emotion("concerned", "Connection anomaly."))
         threading.Thread(target=_send, daemon=True).start()
 
-    EMOTION_SEQUENCE = ["happy", "curious", "excited", "thinking", "confused", "concerned", "idle", "neutral"]
-    EMOTION_REACTIONS = {
-        "happy": "Glad you checked in.",
-        "curious": "Wonder what we'll explore next.",
-        "excited": "Oh! Something exciting?",
-        "thinking": "Pondering a thought...",
-        "confused": "Wait, did something happen?",
-        "concerned": "Hmm, everything alright?",
-        "idle": "Just resting my eyes a bit.",
-        "neutral": "I'm right here with you."
-    }
-
-    def _on_single_click(self, event):
+    def _start_drag(self, event):
         self.drag_x = event.x
         self.drag_y = event.y
         self._dragging = False
@@ -289,32 +364,13 @@ class MascotWindow:
 
     def _end_drag(self, event):
         if not self._dragging:
-            # Clicked on Victor! Dynamic poke without mechanical emotion cycling
-            def _poke():
-                try:
-                    req = url_request.Request(
-                        "http://127.0.0.1:8000/api/poke",
-                        data=b"{}",
-                        headers={"Content-Type": "application/json"},
-                    )
-                    with url_request.urlopen(req, timeout=2) as res:
-                        data = json.loads(res.read().decode("utf-8"))
-                        emo = data.get("emotion", self.emotion)
-                        msg = data.get("message", "Standing by.")
-                        self.root.after(0, lambda e=emo, m=msg: self.set_emotion(e, m))
-                except Exception:
-                    # Offline fallback: dynamic wake up if idle, or dynamic reaction
-                    if self.emotion == "idle":
-                        self.root.after(0, lambda: self.set_emotion("neutral", "Awake. Neural systems active."))
-                    else:
-                        reaction = self.EMOTION_REACTIONS.get(self.emotion, "Standing by.")
-                        self.root.after(0, lambda r=reaction: self.show_speech(r))
-            threading.Thread(target=_poke, daemon=True).start()
+            # Single click activates listening!
+            self._start_voice_listening()
         self._dragging = False
 
     def _on_double_click(self, event):
-        # Double click opens quick chat entry or workshop
-        self.show_input_bubble()
+        # Double click opens Workshop
+        self._open_workshop()
 
     def _open_workshop(self):
         webbrowser.open("http://127.0.0.1:8000")
@@ -323,17 +379,32 @@ class MascotWindow:
         self.menu.tk_popup(event.x_root, event.y_root)
 
     def _ws_telemetry(self):
-        """Polls server for emotion and telemetry updates."""
+        """Polls server for emotion, telemetry, and auto-hide status."""
         while self.ws_running:
             try:
                 with url_request.urlopen("http://127.0.0.1:8000/api/status", timeout=2) as res:
                     data = json.loads(res.read().decode("utf-8"))
                     new_emo = data.get("emotion")
-                    if new_emo and new_emo != self.emotion and not self.input_active:
+                    if new_emo and new_emo != self.emotion and not self.is_listening:
                         self.root.after(0, lambda e=new_emo: self.set_emotion(e))
+
+                    # Auto-Hide when Workshop is focused in front
+                    workshop_focused = data.get("workshop_focused", False)
+                    options = data.get("companion_options", {})
+                    auto_hide = options.get("auto_hide", self.auto_hide_enabled)
+
+                    if auto_hide and workshop_focused and not self._is_hidden:
+                        self._is_hidden = True
+                        self.root.after(0, self.root.withdraw)
+                    elif (not workshop_focused or not auto_hide) and self._is_hidden:
+                        self._is_hidden = False
+                        self.root.after(0, self.root.deiconify)
             except Exception:
                 pass
-            time.sleep(1.5)
+            time.sleep(1.2)
+
+    def _get_accent_color(self) -> str:
+        return EMOTION_ACCENTS.get(self.emotion, "#D4A574")
 
     def _draw(self):
         self.canvas.delete("all")
@@ -356,22 +427,40 @@ class MascotWindow:
             self.canvas.create_image(120, img_y + 72, image=sprite)
         else:
             # Fallback circle if PIL is unavailable
-            self.canvas.create_oval(70, img_y, 170, img_y + 100, fill="#4A3F32", outline="#D4A574", width=2)
-            self.canvas.create_text(120, img_y + 50, text=EMOTIONS.get(self.emotion, {}).get("emoji", "😐"), font=("Segoe UI", 24))
+            accent = self._get_accent_color()
+            self.canvas.create_oval(70, img_y, 170, img_y + 100, fill="#121417", outline=accent, width=2)
+            self.canvas.create_text(120, img_y + 50, text=self.emotion.upper(), fill="#E6E6E6", font=("Segoe UI", 10, "bold"))
 
-        # Render speech bubble if active
+        # Render animated circular/pill speech bubble
         if self.speech_text and time.time() < self.speech_expires:
-            # Bubble rect
-            self.canvas.create_rectangle(12, 10, 228, 52, fill="#181815", outline="#2A2924", width=1)
-            # Arrow pointer pointing to Victor's head
-            self.canvas.create_polygon(115, 52, 125, 52, 120, 58, fill="#181815", outline="#2A2924")
-            # Text inside bubble
+            accent = self._get_accent_color()
+            bubble_pulse = int(round(math.sin(t * 0.15) * 2))
+            
+            # Smooth circular bubble geometry
+            bx1 = 14
+            by1 = 8 + bubble_pulse
+            bx2 = 226
+            by2 = 56 + bubble_pulse
+            
+            # Draw circular/pill oval bubble
+            self.canvas.create_oval(
+                bx1, by1, bx2, by2,
+                fill="#0E1012",
+                outline=accent,
+                width=1.5,
+            )
+            
+            # Connecting speech bubble dots floating towards Victor's head
+            self.canvas.create_oval(117, by2 + 2, 123, by2 + 8, fill="#0E1012", outline=accent, width=1)
+            self.canvas.create_oval(119, by2 + 9, 121, by2 + 11, fill=accent, outline=accent)
+
+            # Bubble text (clean typography, no emojis)
             self.canvas.create_text(
                 120,
-                30,
+                32 + bubble_pulse,
                 text=self.speech_text,
-                width=204,
-                fill="#E8E4DE",
+                width=190,
+                fill="#F0EDE8",
                 font=("Segoe UI", 8),
                 justify="center",
             )

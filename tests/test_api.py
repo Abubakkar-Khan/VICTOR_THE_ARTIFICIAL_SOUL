@@ -80,3 +80,35 @@ def test_api_poke():
     assert poke_data["emotion"] == "neutral"
     assert "Awake" in poke_data["message"]
 
+
+def test_api_mascot_visibility_and_status():
+    res = client.post("/api/mascot/visibility", json={"active": True})
+    assert res.status_code == 200
+    assert res.json()["workshop_focused"] is True
+
+    status_res = client.get("/api/mascot/status")
+    assert status_res.status_code == 200
+    data = status_res.json()
+    assert data["workshop_focused"] is True
+    assert "companion_options" in data
+
+    # Unfocus
+    res2 = client.post("/api/mascot/visibility", json={"active": False})
+    assert res2.status_code == 200
+    assert res2.json()["workshop_focused"] is False
+
+
+def test_api_mascot_options():
+    res = client.post("/api/mascot/options", json={"auto_hide": False, "scale": "compact"})
+    assert res.status_code == 200
+    opts = res.json()["companion_options"]
+    assert opts["auto_hide"] is False
+    assert opts["scale"] == "compact"
+
+
+def test_api_stt_text_passthrough():
+    res = client.post("/api/stt", json={"text": "hello victor"})
+    assert res.status_code == 200
+    assert res.json()["text"] == "hello victor"
+
+

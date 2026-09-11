@@ -43,6 +43,16 @@ hiddenimports = [
     'yaml',
     'urllib.request',
     'tkinter',
+    'webview',
+    'webview.platforms.winforms',
+    'webview.platforms.edgechromium',
+    'sounddevice',
+    'speech_recognition',
+    'scipy',
+    'scipy.io',
+    'scipy.io.wavfile',
+    'clr',
+    'pythonnet',
 ]
 
 a = Analysis(

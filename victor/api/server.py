@@ -4,6 +4,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -70,6 +71,32 @@ class EmotionRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class VisibilityRequest(BaseModel):
+    active: bool
+
+
+class CompanionOptionsRequest(BaseModel):
+    auto_hide: Optional[bool] = None
+    scale: Optional[str] = None
+    always_on_top: Optional[bool] = None
+
+
+class STTRequest(BaseModel):
+    audio_base64: Optional[str] = None
+    text: Optional[str] = None
+
+
+workshop_state = {
+    "focused": False,
+    "last_seen": 0.0,
+    "companion_options": {
+        "auto_hide": True,
+        "scale": "normal",
+        "always_on_top": True,
+    }
+}
+
+
 @app.middleware("http")
 async def add_no_cache_header(request, call_next):
     response = await call_next(request)
@@ -124,7 +151,60 @@ async def get_status():
         "security": agent.config.security.model_dump(),
         "facts_count": len(agent.memory.list_facts()),
         "tasks_count": len(agent.tasks.list_all_tasks()),
+        "workshop_focused": workshop_state["focused"],
+        "companion_options": workshop_state["companion_options"],
     }
+
+
+@app.post("/api/mascot/visibility")
+async def set_mascot_visibility(req: VisibilityRequest):
+    """Called by workshop frontend to indicate window focus/blur."""
+    workshop_state["focused"] = req.active
+    workshop_state["last_seen"] = time.time()
+    await agent.event_bus.emit("workshop.focus", active=req.active)
+    return {"status": "ok", "active": req.active, "workshop_focused": req.active}
+
+
+@app.get("/api/mascot/status")
+async def get_mascot_status():
+    return {
+        "workshop_focused": workshop_state["focused"],
+        "emotion": getattr(agent, "emotion", "idle"),
+        "companion_options": workshop_state["companion_options"],
+    }
+
+
+@app.post("/api/mascot/options")
+async def update_mascot_options(req: CompanionOptionsRequest):
+    if req.auto_hide is not None:
+        workshop_state["companion_options"]["auto_hide"] = req.auto_hide
+    if req.scale is not None:
+        workshop_state["companion_options"]["scale"] = req.scale
+    if req.always_on_top is not None:
+        workshop_state["companion_options"]["always_on_top"] = req.always_on_top
+    await agent.event_bus.emit("companion.options", options=workshop_state["companion_options"])
+    return {"status": "ok", "companion_options": workshop_state["companion_options"]}
+
+
+@app.post("/api/stt")
+async def stt_endpoint(req: STTRequest):
+    """Transcribe audio base64 or pass-through text via SpeechRecognition."""
+    if req.text:
+        return {"status": "ok", "text": req.text.strip()}
+    if req.audio_base64:
+        try:
+            import base64
+            import io
+            import speech_recognition as sr
+            audio_bytes = base64.b64decode(req.audio_base64)
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+                return {"status": "ok", "text": text}
+        except Exception as e:
+            return {"status": "error", "error": str(e), "text": ""}
+    return {"status": "ok", "text": ""}
 
 
 @app.post("/api/emotion")
@@ -266,10 +346,15 @@ async def switch_model(req: ModelSwitchRequest):
 @app.post("/api/mascot/launch")
 async def launch_mascot():
     try:
-        mascot_script = Path(__file__).parent.parent / "desktop" / "mascot.py"
         DETACHED_PROCESS = 0x00000008
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable, "--mascot"]
+        else:
+            mascot_script = Path(__file__).parent.parent / "desktop" / "mascot.py"
+            cmd = [sys.executable, str(mascot_script)]
+
         subprocess.Popen(
-            [sys.executable, str(mascot_script)],
+            cmd,
             creationflags=DETACHED_PROCESS,
             close_fds=True,
         )

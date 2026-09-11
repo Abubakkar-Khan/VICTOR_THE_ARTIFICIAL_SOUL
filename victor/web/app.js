@@ -10,14 +10,14 @@
   // ── 8 Artificial Soul Emotions ──────────────────────────────────
 
   const EMOTIONS = {
-    neutral:   { emoji: '😐', label: 'NEUTRAL',   sprite: '/static/sprites/neutral.png',   desc: 'Standing by. Calm and level-headed.' },
-    happy:     { emoji: '😊', label: 'HAPPY',     sprite: '/static/sprites/happy.png',     desc: 'Optimal resonance. Systems running cleanly.' },
-    curious:   { emoji: '🤔', label: 'CURIOUS',   sprite: '/static/sprites/curious.png',   desc: 'Observing closely. Exploring telemetry.' },
-    idle:      { emoji: '😴', label: 'IDLE',      sprite: '/static/sprites/idle.png',      desc: 'Deep standby. Drifting quietly.' },
-    thinking:  { emoji: '🧠', label: 'THINKING',  sprite: '/static/sprites/thinking.png',  desc: 'Synthesizing reasoning vectors.' },
-    excited:   { emoji: '😮', label: 'EXCITED',   sprite: '/static/sprites/excited.png',   desc: 'Fascinating discovery! High neural resonance.' },
-    confused:  { emoji: '😕', label: 'CONFUSED',  sprite: '/static/sprites/confused.png',  desc: 'Ambiguous vector. Clarification required.' },
-    concerned: { emoji: '😔', label: 'CONCERNED', sprite: '/static/sprites/concerned.png', desc: 'Anomaly detected. Proceeding with caution.' }
+    neutral:   { label: 'NEUTRAL',   sprite: '/static/sprites/neutral.png',   desc: 'Standing by. Calm and level-headed.' },
+    happy:     { label: 'HAPPY',     sprite: '/static/sprites/happy.png',     desc: 'Optimal resonance. Systems running cleanly.' },
+    curious:   { label: 'CURIOUS',   sprite: '/static/sprites/curious.png',   desc: 'Observing closely. Exploring telemetry.' },
+    idle:      { label: 'IDLE',      sprite: '/static/sprites/idle.png',      desc: 'Deep standby. Drifting quietly.' },
+    thinking:  { label: 'THINKING',  sprite: '/static/sprites/thinking.png',  desc: 'Synthesizing reasoning vectors.' },
+    excited:   { label: 'EXCITED',   sprite: '/static/sprites/excited.png',   desc: 'Fascinating discovery! High neural resonance.' },
+    confused:  { label: 'CONFUSED',  sprite: '/static/sprites/confused.png',  desc: 'Ambiguous vector. Clarification required.' },
+    concerned: { label: 'CONCERNED', sprite: '/static/sprites/concerned.png', desc: 'Anomaly detected. Proceeding with caution.' }
   };
 
 
@@ -182,6 +182,8 @@
   const btnRefreshModels = $('#btn-refresh-models');
   const soundToggle = $('#sound-toggle');
   const btnLaunchMascot = $('#btn-launch-mascot');
+  const toggleAutohide = $('#toggle-autohide');
+  const selectCompanionScale = $('#select-companion-scale');
   const shellStatus = $('#shell-status');
 
   const permModal = $('#permission-modal');
@@ -213,8 +215,8 @@
       }, 90);
     }
 
-    // Telemetry indicators
-    if (emotionIcon) emotionIcon.textContent = data.emoji;
+    // Telemetry indicators (zero emoji)
+    if (emotionIcon) emotionIcon.textContent = '';
     if (emotionName) emotionName.textContent = data.label;
     if (statusText && updatePersonality) {
       statusText.textContent = data.desc;
@@ -930,10 +932,64 @@
       if (data.emotion) {
         setEmotion(data.emotion, false);
       }
+      if (data.companion_options) {
+        if (toggleAutohide) {
+          toggleAutohide.classList.toggle('on', data.companion_options.auto_hide !== false);
+        }
+        if (selectCompanionScale && data.companion_options.scale) {
+          selectCompanionScale.value = data.companion_options.scale;
+        }
+      }
     } catch (e) {}
 
     await refreshModelsList();
   }
+
+  // Companion Options Handlers
+  if (toggleAutohide) {
+    toggleAutohide.addEventListener('click', async () => {
+      toggleAutohide.classList.toggle('on');
+      const isAuto = toggleAutohide.classList.contains('on');
+      try {
+        await fetch('/api/mascot/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auto_hide: isAuto })
+        });
+      } catch (e) {}
+    });
+  }
+
+  if (selectCompanionScale) {
+    selectCompanionScale.addEventListener('change', async () => {
+      const scaleVal = selectCompanionScale.value;
+      try {
+        await fetch('/api/mascot/options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scale: scaleVal })
+        });
+      } catch (e) {}
+    });
+  }
+
+  // ── Workshop Focus Tracking (Desktop Companion Continuity) ────
+  // When Workshop is active in front, desktop companion auto-hides.
+  // When Workshop is minimized or blurred, desktop companion reveals itself.
+
+  function reportWorkshopFocus(focused) {
+    fetch('/api/mascot/visibility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !!focused })
+    }).catch(() => {});
+  }
+
+  window.addEventListener('focus', () => reportWorkshopFocus(true));
+  window.addEventListener('blur', () => reportWorkshopFocus(false));
+  document.addEventListener('visibilitychange', () => {
+    reportWorkshopFocus(!document.hidden);
+  });
 
   async function refreshModelsList() {
     try {
@@ -1110,8 +1166,17 @@
       if (data.emotion) {
         setEmotion(data.emotion, false, true);
       }
+      if (data.companion_options) {
+        if (toggleAutohide) {
+          toggleAutohide.classList.toggle('on', data.companion_options.auto_hide !== false);
+        }
+        if (selectCompanionScale && data.companion_options.scale) {
+          selectCompanionScale.value = data.companion_options.scale;
+        }
+      }
     } catch (e) {}
 
+    reportWorkshopFocus(!document.hidden && (document.hasFocus ? document.hasFocus() : true));
     refreshModelsList();
     initVoice();
     initWebSocket();
