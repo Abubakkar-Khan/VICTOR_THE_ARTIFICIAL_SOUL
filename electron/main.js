@@ -23,6 +23,7 @@ function createWorkshopWindow() {
     minHeight: 640,
     backgroundColor: '#11110F',
     title: 'Victor — The Artificial Soul',
+    icon: path.join(__dirname, '../victor/sprite/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -51,6 +52,7 @@ function createCompanionWindow() {
     resizable: false,
     skipTaskbar: true,
     hasShadow: false,
+    icon: path.join(__dirname, '../victor/sprite/icon.ico'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false

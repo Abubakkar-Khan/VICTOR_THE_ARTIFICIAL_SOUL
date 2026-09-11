@@ -104,6 +104,11 @@ class MascotWindow:
         # Sprite cache
         self.sprites = {}
         self._load_sprites()
+        if self.sprites.get("neutral"):
+            try:
+                self.root.iconphoto(True, self.sprites["neutral"])
+            except Exception:
+                pass
 
         # Chat Entry Setup
         self.chat_entry = tk.Entry(
