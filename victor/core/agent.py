@@ -375,20 +375,6 @@ class VictorAgent:
             result: ToolResult = await self.registry.execute_tool(tool_name, **parameters)
 
             step.duration = result.duration
-            if result.success:
-                step.status = "completed"
-                step.output = str(result.output)[:200]
-                await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
-                if tool_name in ["web_search", "youtube", "browser"]:
-                    await self.set_emotion("eureka" if any(w in user_message.lower() for w in ["find", "search", "solve", "how", "what", "where"]) else "excited", reason="Discovered live web information")
-                else:
-                    await self.set_emotion("happy", reason="Action succeeded")
-            else:
-                step.status = "failed"
-                step.output = str(result.error)
-                await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
-                await self.set_emotion("concerned", reason=f"Tool {tool_name} encountered an error")
-
             tool_executed_info = {
                 "name": tool_name,
                 "parameters": parameters,
@@ -399,37 +385,61 @@ class VictorAgent:
             tool_obj = self.registry.get(tool_name)
             obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
-            # Check if user explicitly asked for detail
-            wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
-            length_rule = "Give a detailed answer as requested." if wants_detail else "Keep your answer small and concise: 1 to 2 sentences max. Do NOT give unsolicited essays."
-
-            # Ask the model to synthesize a natural response
-            observation_msg = (
-                f"Tool result ({tool_name}):\n"
-                f"{obs_formatted}\n\n"
-                f"The user asked: {user_message}\n"
-                f"{length_rule} No emojis. No raw JSON."
-            )
-
-            synthetic_history = list(self.history)
-            synthetic_history.append(ChatMessage(role="user", content=observation_msg))
-
-            await self.event_bus.emit("agent.state", state="thinking")
-            try:
-                final_resp = await self.llm.generate(
-                    messages=synthetic_history,
-                    system_prompt=system_prompt,
-                    temperature=self.config.model.temperature,
-                    max_tokens=self.config.model.max_tokens if wants_detail else 120,
-                )
-                if final_resp.content and not final_resp.content.startswith("[Ollama"):
-                    final_content = strip_emojis(final_resp.content.strip())
+            if not result.success:
+                step.status = "failed"
+                step.output = str(result.error)
+                await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
+                await self.set_emotion("concerned", reason=f"Tool {tool_name} encountered an error")
+                # REPORT TRUTH DIRECTLY: never feed errors to LLM to hallucinate success
+                final_content = obs_formatted if obs_formatted else f"Action failed: {result.error}"
+                self.tasks.complete_task(task.id, outcome=final_content[:150])
+            else:
+                step.status = "completed"
+                step.output = str(result.output)[:200]
+                await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                if tool_name in ["web_search", "youtube", "browser"]:
+                    await self.set_emotion("eureka" if any(w in user_message.lower() for w in ["find", "search", "solve", "how", "what", "where"]) else "excited", reason="Discovered live web information")
                 else:
-                    final_content = obs_formatted
-            except Exception:
-                final_content = obs_formatted
+                    await self.set_emotion("happy", reason="Action succeeded")
 
-            self.tasks.complete_task(task.id, outcome=final_content[:150])
+                # Check if user explicitly asked for detail
+                wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
+                is_direct_action = (
+                    tool_name in ["applications", "keyboard", "window_manager", "computer"] or
+                    (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file"]) or
+                    (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
+                )
+
+                if is_direct_action and not wants_detail:
+                    final_content = obs_formatted
+                else:
+                    length_rule = "Give a detailed answer as requested." if wants_detail else "Keep your answer small and concise: 1 to 2 sentences max. Do NOT give unsolicited essays."
+                    observation_msg = (
+                        f"Tool result ({tool_name}):\n"
+                        f"{obs_formatted}\n\n"
+                        f"The user asked: {user_message}\n"
+                        f"{length_rule} No emojis. No raw JSON. State facts accurately."
+                    )
+
+                    synthetic_history = list(self.history)
+                    synthetic_history.append(ChatMessage(role="user", content=observation_msg))
+
+                    await self.event_bus.emit("agent.state", state="thinking")
+                    try:
+                        final_resp = await self.llm.generate(
+                            messages=synthetic_history,
+                            system_prompt=system_prompt,
+                            temperature=self.config.model.temperature,
+                            max_tokens=self.config.model.max_tokens if wants_detail else 120,
+                        )
+                        if final_resp.content and not final_resp.content.startswith("[Ollama"):
+                            final_content = strip_emojis(final_resp.content.strip())
+                        else:
+                            final_content = obs_formatted
+                    except Exception:
+                        final_content = obs_formatted
+
+                self.tasks.complete_task(task.id, outcome=final_content[:150])
 
         # Case B: LLM reasoning with potential tool calling
         else:
@@ -460,56 +470,80 @@ class VictorAgent:
                 await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
                 result = await self.registry.execute_tool(tool_name, **parameters)
 
-                if result.success:
-                    await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
-                    await self.set_emotion("happy", reason=f"{tool_name} completed successfully")
-                else:
-                    await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
-                    await self.set_emotion("concerned", reason=f"{tool_name} failed")
-
                 tool_executed_info = {
                     "name": tool_name,
                     "parameters": parameters,
                     "result": result.model_dump(),
                 }
-
-                # Get the tool's formatted display
                 tool_obj = self.registry.get(tool_name)
                 obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
-                length_rule = "Provide a detailed answer as requested." if wants_detail else "Keep your response small and concise: 1 to 2 sentences max."
-                observation_msg = (
-                    f"Tool result ({tool_name}):\n"
-                    f"{obs_formatted}\n\n"
-                    f"{length_rule} No emojis. No raw JSON."
-                )
-
-                synthetic_history = list(self.history)
-                synthetic_history.append(ChatMessage(role="assistant", content=initial_content))
-                synthetic_history.append(ChatMessage(role="user", content=observation_msg))
-
-                await self.event_bus.emit("agent.state", state="thinking")
-                try:
-                    final_resp = await self.llm.generate(
-                        messages=synthetic_history,
-                        system_prompt=system_prompt,
-                        temperature=self.config.model.temperature,
-                        max_tokens=self.config.model.max_tokens if wants_detail else 120,
-                    )
-                    if final_resp.content and not final_resp.content.startswith("[Ollama"):
-                        final_content = strip_emojis(final_resp.content.strip())
-                    else:
-                        final_content = obs_formatted
-                except Exception:
-                    final_content = obs_formatted
-            else:
-                final_content = strip_emojis(initial_content.strip())
-                if "?" in user_message and not any(w in final_content.lower() for w in ["cannot", "sorry", "error"]):
-                    await self.set_emotion("happy", reason="Answered inquiry")
-                elif any(w in final_content.lower() for w in ["unclear", "what do you mean", "could not understand"]):
-                    await self.set_emotion("confused", reason="Request was ambiguous")
+                if not result.success:
+                    await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
+                    await self.set_emotion("concerned", reason=f"{tool_name} failed")
+                    final_content = obs_formatted if obs_formatted else f"Action failed: {result.error}"
                 else:
-                    await self.set_emotion("neutral", reason="Normal dialogue")
+                    await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                    await self.set_emotion("happy", reason=f"{tool_name} completed successfully")
+
+                    is_direct_action = (
+                        tool_name in ["applications", "keyboard", "window_manager", "computer"] or
+                        (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file"]) or
+                        (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
+                    )
+
+                    if is_direct_action and not wants_detail:
+                        final_content = obs_formatted
+                    else:
+                        length_rule = "Provide a detailed answer as requested." if wants_detail else "Keep your response small and concise: 1 to 2 sentences max."
+                        observation_msg = (
+                            f"Tool result ({tool_name}):\n"
+                            f"{obs_formatted}\n\n"
+                            f"{length_rule} No emojis. No raw JSON. State facts accurately."
+                        )
+
+                        synthetic_history = list(self.history)
+                        synthetic_history.append(ChatMessage(role="assistant", content=initial_content))
+                        synthetic_history.append(ChatMessage(role="user", content=observation_msg))
+
+                        await self.event_bus.emit("agent.state", state="thinking")
+                        try:
+                            final_resp = await self.llm.generate(
+                                messages=synthetic_history,
+                                system_prompt=system_prompt,
+                                temperature=self.config.model.temperature,
+                                max_tokens=self.config.model.max_tokens if wants_detail else 120,
+                            )
+                            if final_resp.content and not final_resp.content.startswith("[Ollama"):
+                                final_content = strip_emojis(final_resp.content.strip())
+                            else:
+                                final_content = obs_formatted
+                        except Exception:
+                            final_content = obs_formatted
+            else:
+                raw_reply = strip_emojis(initial_content.strip())
+
+                # Anti-lying guardrail: Check if model claims to have performed an action when no tool ran
+                CLAIM_PATTERNS = [
+                    r"\b(?:i have|i've|i just)\s+(?:opened|launched|created|deleted|closed|started|switched to|typed|minimized|maximized|saved)\b",
+                    r"\b(?:done|completed)[!,.]?\s+(?:i\s+)?(?:have\s+)?(?:opened|created|launched|closed)\b",
+                    r"\b(?:here is the file i (?:have )?created)\b",
+                    r"\b(?:i went ahead and (?:opened|created|launched))\b",
+                    r"\b(?:successfully (?:opened|created|launched|closed))\b"
+                ]
+                is_hallucinating_action = any(re.search(pat, raw_reply, re.IGNORECASE) for pat in CLAIM_PATTERNS)
+
+                if is_hallucinating_action:
+                    final_content = "I didn't perform that action because no matching tool was executed. Please specify the exact application, file name, or command."
+                    await self.set_emotion("concerned", reason="Intercepted hallucinated action claim")
+                else:
+                    final_content = raw_reply
+                    if "?" in user_message and not any(w in final_content.lower() for w in ["cannot", "sorry", "error"]):
+                        await self.set_emotion("happy", reason="Answered inquiry")
+                    elif any(w in final_content.lower() for w in ["unclear", "what do you mean", "could not understand"]):
+                        await self.set_emotion("confused", reason="Request was ambiguous")
+                    else:
+                        await self.set_emotion("neutral", reason="Normal dialogue")
 
         self.history.append(ChatMessage(role="assistant", content=final_content))
         duration = round(time.perf_counter() - start_time, 3)

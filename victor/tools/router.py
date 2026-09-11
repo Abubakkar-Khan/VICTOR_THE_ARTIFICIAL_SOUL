@@ -13,12 +13,14 @@ class ToolRouter:
         """Iterates all registered tools, checks their intent_patterns, and returns (tool_name, extracted_params)."""
         cleaned = user_input.strip()
         lower = cleaned.lower()
+        # Normalize polite phrasing: "can you please open chrome" -> "open chrome"
+        normalized = re.sub(r'^(?:can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|would\s+you\s+(?:please\s+)?|please\s+|kindly\s+)', '', lower).strip()
 
         for tool in self.registry.list_tools():
             patterns = tool.intent_patterns()
             for pattern_dict in patterns:
                 pattern = pattern_dict.get("pattern", "")
-                m = re.match(pattern, lower) or re.search(pattern, cleaned)
+                m = re.match(pattern, normalized) or re.match(pattern, lower) or re.search(pattern, cleaned)
                 if m:
                     extract = pattern_dict.get("extract")
                     params = {}
@@ -38,7 +40,7 @@ class ToolRouter:
                             else:
                                 params[k] = v
 
-                    if params:
+                    if params is not None and (params or isinstance(extract, dict)):
                         return (tool.name, params)
 
         return None

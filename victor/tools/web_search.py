@@ -86,9 +86,22 @@ class WebSearchTool(BaseTool):
     def intent_patterns(self) -> list[dict]:
         def extract_query(m) -> dict:
             query = m.group(1).strip().rstrip("?.!")
-            if query:
-                return {"query": query}
-            return None
+            if not query:
+                return None
+            lower = query.lower()
+            if (lower.startswith("file") or 
+                "file named" in lower or 
+                "files named" in lower or 
+                "my computer" in lower or 
+                "this computer" in lower or 
+                "my pc" in lower or 
+                "on my pc" in lower or 
+                "in downloads" in lower or 
+                "in desktop" in lower or 
+                "downloaded" in lower or 
+                "youtube" in lower):
+                return None
+            return {"query": query}
 
         return [
             {"pattern": r"^(?:search(?:\s+the\s+web)?(?:\s+for)?|look\s+up|google|find(?:\s+information)?\s+about)\s+(.+)$", "extract": extract_query},

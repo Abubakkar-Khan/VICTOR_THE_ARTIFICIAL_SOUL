@@ -117,3 +117,23 @@ async def test_agent_emotion_and_brevity():
     res = await agent.chat("Are you working?")
     assert "System is optimal" in res["content"]
     assert res["emotion"] in ["happy", "neutral"]
+
+
+@pytest.mark.asyncio
+async def test_anti_lying_interception():
+    # If LLM hallucinates an action completion when no tool was executed
+    agent = VictorAgent(llm=MockLLM("I have opened Google Chrome and searched for you."))
+    res = await agent.chat("Do something undefined without tool")
+    assert "didn't perform that action" in res["content"].lower() or "did not perform that action" in res["content"].lower()
+    assert res["emotion"] == "concerned"
+
+
+@pytest.mark.asyncio
+async def test_honest_failure_reporting():
+    agent = VictorAgent(llm=MockLLM("I successfully read the file!"))
+    # Request a non-existent file
+    res = await agent.chat("read file definitely_non_existent_file_xyz_123.txt")
+    assert res["tool_executed"] is not None
+    assert "error" in res["content"].lower() or "failed" in res["content"].lower() or "not found" in res["content"].lower()
+    assert "successfully read" not in res["content"].lower()
+

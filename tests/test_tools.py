@@ -108,3 +108,99 @@ async def test_notification_tool():
     assert res.success is True
     assert res.output["status"] == "delivered"
 
+
+@pytest.mark.asyncio
+async def test_keyboard_tool():
+    from victor.tools.keyboard import KeyboardTool
+    tool = KeyboardTool()
+    # Test unknown key
+    err_res = await tool.execute(action="press_key", key="nonexistent_key_xyz")
+    assert err_res.success is True
+    assert err_res.output["status"] == "error"
+
+    # Test format_display
+    assert "Pressed key" in tool.format_display({"status": "success", "action": "press_key", "key": "enter"})
+    assert "Typed" in tool.format_display({"status": "success", "action": "type_text", "typed": "hello"})
+
+
+@pytest.mark.asyncio
+async def test_window_manager_tool():
+    from victor.tools.window_manager import WindowManagerTool
+    tool = WindowManagerTool()
+    res = await tool.execute(action="list_windows")
+    assert res.success is True
+    assert "windows" in res.output
+    assert isinstance(res.output["windows"], list)
+
+    # Missing title returns error status
+    focus_res = await tool.execute(action="focus_window", title="")
+    assert focus_res.output["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_screen_observer_tool():
+    from victor.tools.screen_observer import ScreenObserverTool
+    tool = ScreenObserverTool()
+    res = await tool.execute(action="observe_screen")
+    assert res.success is True
+    assert "tree" in res.output
+
+
+@pytest.mark.asyncio
+async def test_filesystem_search_and_list(tmp_path):
+    from victor.tools.filesystem import FilesystemTool
+    (tmp_path / "test_doc1.txt").write_text("hello", encoding="utf-8")
+    (tmp_path / "test_doc2.log").write_text("world", encoding="utf-8")
+    sub = tmp_path / "subdir"
+    sub.mkdir()
+
+    tool = FilesystemTool(allowed_roots=[str(tmp_path)])
+    
+    # Test list_directory
+    list_res = await tool.execute(action="list", path=str(tmp_path))
+    assert list_res.success is True
+    names = [c["name"] for c in list_res.output["contents"]]
+    assert "test_doc1.txt" in names
+    assert "subdir" in names
+
+    # Test search_files
+    search_res = await tool.execute(action="search", query="*.txt", locations=[str(tmp_path)])
+    assert search_res.success is True
+    assert len(search_res.output["results"]) >= 1
+    assert "test_doc1.txt" in search_res.output["results"][0]["path"]
+
+
+@pytest.mark.asyncio
+async def test_tool_router_pc_intents():
+    from victor.tools.factory import create_tool_registry
+    from victor.tools.router import ToolRouter
+    
+    registry = create_tool_registry()
+    router = ToolRouter(registry)
+
+    # Test window manager routing
+    w_match = router.route("list windows")
+    assert w_match is not None
+    assert w_match[0] == "window_manager"
+    assert w_match[1]["action"] == "list_windows"
+
+    # Test keyboard routing
+    k_match = router.route("type hello world")
+    assert k_match is not None
+    assert k_match[0] == "keyboard"
+    assert k_match[1]["action"] == "type_text"
+    assert k_match[1]["text"] == "hello world"
+
+    # Test screen observer routing
+    s_match = router.route("observe screen")
+    assert s_match is not None
+    assert s_match[0] == "screen_observer"
+    assert s_match[1]["action"] == "observe_screen"
+
+    # Test search file routing
+    f_match = router.route("search for files named report.pdf")
+    assert f_match is not None
+    assert f_match[0] == "filesystem"
+    assert f_match[1]["action"] == "search"
+    assert f_match[1]["query"] == "report.pdf"
+

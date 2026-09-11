@@ -14,6 +14,10 @@ from victor.tools.shell import ShellTool
 from victor.tools.web_search import WebSearchTool
 from victor.tools.youtube import YouTubeTool
 
+from victor.tools.keyboard import KeyboardTool
+from victor.tools.window_manager import WindowManagerTool  
+from victor.tools.screen_observer import ScreenObserverTool
+
 
 def create_tool_registry(config: Optional[VictorConfig] = None) -> ToolRegistry:
     """Create a ToolRegistry configured with standard tools and permissions."""
@@ -28,6 +32,10 @@ def create_tool_registry(config: Optional[VictorConfig] = None) -> ToolRegistry:
     registry.register(ApplicationTool())
     registry.register(ComputerTool())
     registry.register(NotificationTool())
+
+    registry.register(KeyboardTool())
+    registry.register(WindowManagerTool())
+    registry.register(ScreenObserverTool())
 
     allowed_roots = config.security.allowed_file_roots if config else ["."]
     registry.register(FilesystemTool(allowed_roots=allowed_roots))

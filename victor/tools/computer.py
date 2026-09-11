@@ -89,13 +89,17 @@ class ComputerTool(BaseTool):
                 "enum": ["click", "move", "scroll", "window_info", "screen_info"],
                 "description": "The computer control action to perform"
             },
+            "element": {
+                "type": "string",
+                "description": "UI element ID from observe_screen to click (e.g. 'e1', 'e2')"
+            },
             "x": {
                 "type": "integer",
-                "description": "X coordinate on screen"
+                "description": "X coordinate on screen (fallback if element not provided)"
             },
             "y": {
                 "type": "integer",
-                "description": "Y coordinate on screen"
+                "description": "Y coordinate on screen (fallback if element not provided)"
             },
             "button": {
                 "type": "string",
@@ -106,9 +110,14 @@ class ComputerTool(BaseTool):
                 "type": "boolean",
                 "description": "Whether to perform a double click"
             },
+            "direction": {
+                "type": "string",
+                "enum": ["up", "down"],
+                "description": "Scroll direction ('up' or 'down')"
+            },
             "scroll_amount": {
                 "type": "integer",
-                "description": "Number of scroll clicks (positive for up, negative for down)"
+                "description": "Number of scroll clicks"
             }
         },
         "required": ["action"]
@@ -117,10 +126,12 @@ class ComputerTool(BaseTool):
     async def run(
         self,
         action: str = "window_info",
+        element: Optional[str] = None,
         x: Optional[int] = None,
         y: Optional[int] = None,
         button: str = "left",
         double: bool = False,
+        direction: Optional[str] = None,
         scroll_amount: int = -2,
         **kwargs: Any,
     ) -> Dict[str, Any]:
@@ -152,7 +163,64 @@ class ComputerTool(BaseTool):
             ctrl.mouse_move(x, y)
             return {"action": "move", "x": x, "y": y, "status": "success"}
 
-        elif action == "click":
+            # 1. UI Automation Element ID or Text resolution
+            target_eid = element or kwargs.get("element_id")
+            if target_eid:
+                target_eid = target_eid.strip().lower()
+                from victor.tools.screen_observer import _element_cache
+                control = _element_cache.get(target_eid)
+                if not control:
+                    # Search by text match in cached elements
+                    for k, ctrl_item in _element_cache.items():
+                        try:
+                            if target_eid in getattr(ctrl_item, "Name", "").lower():
+                                control = ctrl_item
+                                target_eid = k
+                                break
+                        except Exception:
+                            pass
+
+                if control:
+                    try:
+                        if hasattr(control, "BoundingRectangle"):
+                            rect = control.BoundingRectangle
+                            cx = int((rect.left + rect.right) / 2)
+                            cy = int((rect.top + rect.bottom) / 2)
+                            ctrl.mouse_click(x=cx, y=cy, button=button, double=double)
+                            return {
+                                "action": "click",
+                                "element": target_eid,
+                                "name": getattr(control, "Name", ""),
+                                "x": cx,
+                                "y": cy,
+                                "button": button,
+                                "double": double,
+                                "status": "success",
+                            }
+                        elif hasattr(control, "Click"):
+                            if double and hasattr(control, "DoubleClick"):
+                                control.DoubleClick()
+                            elif button == "right" and hasattr(control, "RightClick"):
+                                control.RightClick()
+                            else:
+                                control.Click()
+                            return {
+                                "action": "click",
+                                "element": target_eid,
+                                "name": getattr(control, "Name", ""),
+                                "status": "success",
+                            }
+                    except Exception as e:
+                        pass
+                else:
+                    return {
+                        "action": "click",
+                        "element": target_eid,
+                        "status": "error",
+                        "message": f"Element '{target_eid}' not found in active screen cache. Use 'observe screen' to refresh."
+                    }
+
+            # 2. Coordinate fallback
             ctrl.mouse_click(x=x, y=y, button=button, double=double)
             return {
                 "action": "click",
@@ -164,10 +232,15 @@ class ComputerTool(BaseTool):
             }
 
         elif action == "scroll":
-            ctrl.mouse_scroll(scroll_amount)
+            amt = scroll_amount
+            d = (direction or "down").strip().lower()
+            clicks = abs(amt) if amt != 0 else 3
+            amt = clicks if d == "up" else -clicks
+            ctrl.mouse_scroll(amt)
             return {
                 "action": "scroll",
-                "amount": scroll_amount,
+                "amount": amt,
+                "direction": "up" if amt > 0 else "down",
                 "status": "success",
             }
 
@@ -176,11 +249,33 @@ class ComputerTool(BaseTool):
     def intent_patterns(self) -> list[dict]:
         def extract_click(m) -> dict:
             return {"action": "click", "x": int(m.group(1)), "y": int(m.group(2))}
+
+        def extract_element_click(m) -> dict:
+            eid = m.group(1).strip().lower()
+            return {"action": "click", "element": eid}
+
+        def extract_element_double_click(m) -> dict:
+            eid = m.group(1).strip().lower()
+            return {"action": "click", "element": eid, "double": True}
+
+        def extract_element_right_click(m) -> dict:
+            eid = m.group(1).strip().lower()
+            return {"action": "click", "element": eid, "button": "right"}
+
+        def extract_scroll(m) -> dict:
+            d = m.group(1) if m.lastindex else "down"
+            direction = (d or "down").strip().lower()
+            return {"action": "scroll", "direction": direction}
             
         return [
             {"pattern": r"^(what is the active window|active window|what window is open|current window)$", "extract": {"action": "window_info"}},
             {"pattern": r"^(screen size|screen resolution|display size)$", "extract": {"action": "screen_info"}},
-            {"pattern": r"^click\s+(?:mouse\s+)?(?:at\s+)?([0-9]+)[,\s]+([0-9]+)$", "extract": extract_click}
+            {"pattern": r"^double\s+click\s+([eE][0-9]+)$", "extract": extract_element_double_click},
+            {"pattern": r"^right\s+click\s+([eE][0-9]+)$", "extract": extract_element_right_click},
+            {"pattern": r"^click\s+(?:mouse\s+)?(?:at\s+)?([0-9]+)[,\s]+([0-9]+)$", "extract": extract_click},
+            {"pattern": r"^click\s+([eE][0-9]+)$", "extract": extract_element_click},
+            {"pattern": r"^click\s+(?:the\s+)?(.+?)(?:\s+button)?$", "extract": extract_element_click},
+            {"pattern": r"^scroll\s*(up|down)?$", "extract": extract_scroll}
         ]
 
     def format_display(self, result) -> str:

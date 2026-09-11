@@ -28,3 +28,9 @@ security:
   allow_shell: false
   allowed_file_roots:
     - "."
+    - "~/Desktop"
+    - "~/Downloads"
+    - "~/Documents"
+    - "~/Pictures"
+    - "~/Videos"
+    - "~/Music"

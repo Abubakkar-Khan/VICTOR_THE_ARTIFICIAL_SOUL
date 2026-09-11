@@ -1387,6 +1387,271 @@
   if (btnPermDeny) btnPermDeny.addEventListener('click', () => resolvePermission('deny'));
 
 
+  // ── Creative Coding Particle & Neural Line Canvas ─────────────
+
+  // ── Creative Coding Particle & Neural Line Canvas ─────────────
+
+  function initParticleCanvas() {
+    const canvas = document.getElementById('particle-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    function resize() {
+      const parent = canvas.parentElement || document.body;
+      const w = parent.clientWidth || window.innerWidth;
+      const h = parent.clientHeight || window.innerHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    }
+    resize();
+
+    if (window.ResizeObserver && canvas.parentElement) {
+      const ro = new ResizeObserver(() => resize());
+      ro.observe(canvas.parentElement);
+    } else {
+      window.addEventListener('resize', resize);
+    }
+
+    const numParticles = 60;
+    const particles = [];
+
+    for (let i = 0; i < numParticles; i++) {
+      particles.push({
+        x: Math.random() * (canvas.width || window.innerWidth),
+        y: Math.random() * (canvas.height || window.innerHeight),
+        vx: (Math.random() - 0.5) * 0.55,
+        vy: (Math.random() - 0.5) * 0.55,
+        radius: Math.random() * 2.2 + 1.8, // 1.8px to 4.0px radius
+        baseAlpha: Math.random() * 0.35 + 0.35, // 0.35 to 0.70 clearly visible
+        pulseSpeed: Math.random() * 0.02 + 0.01,
+        pulseOffset: Math.random() * Math.PI * 2
+      });
+    }
+
+    function getAccentRgb() {
+      const emo = currentEmotion || 'neutral';
+      const map = {
+        happy: '255, 107, 0',
+        thinking: '245, 158, 11',
+        curious: '0, 240, 255',
+        excited: '255, 85, 0',
+        eureka: '250, 204, 21',
+        confused: '234, 179, 8',
+        concerned: '239, 68, 68',
+        listening: '16, 185, 129',
+        searching: '6, 182, 212',
+        skeptical: '251, 146, 60'
+      };
+      return map[emo] || '56, 189, 248';
+    }
+
+    let frame = 0;
+    function draw() {
+      frame++;
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      const rgb = getAccentRgb();
+
+      // Neural line connections between nearby particles
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 130) {
+            const lineAlpha = (1 - dist / 130) * 0.22;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(${rgb}, ${lineAlpha})`;
+            ctx.lineWidth = 1.0;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Render glowing circular particles
+      particles.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        const pulse = Math.sin(frame * p.pulseSpeed + p.pulseOffset) * 0.2;
+        const currentAlpha = Math.max(0.15, Math.min(0.9, p.baseAlpha + pulse));
+
+        // Soft outer glow
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rgb}, ${currentAlpha * 0.25})`;
+        ctx.fill();
+
+        // Solid luminous core
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rgb}, ${currentAlpha})`;
+        ctx.fill();
+      });
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  }
+
+
+  // ── Multi-Conversation Thread Manager ─────────────────────────
+
+  const STORAGE_KEY_CHATS = 'dexter_chats_v2';
+  let conversations = [];
+  let activeChatId = null;
+
+  function loadConversations() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_CHATS);
+      if (raw) {
+        conversations = JSON.parse(raw);
+      }
+    } catch (e) {
+      conversations = [];
+    }
+
+    if (!conversations.length) {
+      const now = Date.now();
+      conversations = [
+        { id: 'chat-1', title: 'Untitled Chat', updated_at: now - 2 * 60 * 1000, turns: [] },
+        { id: 'chat-2', title: 'Project Ideas', updated_at: now - 60 * 60 * 1000, turns: [] },
+        { id: 'chat-3', title: 'Code Review', updated_at: now - 3 * 60 * 60 * 1000, turns: [] },
+        { id: 'chat-4', title: 'Random Thoughts', updated_at: now - 24 * 60 * 60 * 1000, turns: [] },
+        { id: 'chat-5', title: 'Web App Setup', updated_at: now - 48 * 60 * 60 * 1000, turns: [] }
+      ];
+      saveConversations();
+    }
+
+    activeChatId = conversations[0].id;
+    renderSidebarRecentChats();
+    updateActiveChatDisplay();
+  }
+
+  function saveConversations() {
+    try {
+      localStorage.setItem(STORAGE_KEY_CHATS, JSON.stringify(conversations));
+    } catch (e) {}
+  }
+
+  function getTimeAgoLabel(timestamp) {
+    const diffMs = Date.now() - timestamp;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return `${Math.max(1, mins)}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
+  }
+
+  function renderSidebarRecentChats() {
+    const container = document.getElementById('recent-chats-list');
+    const badge = document.getElementById('chats-count-badge');
+    if (badge) badge.textContent = conversations.length;
+    if (!container) return;
+
+    container.innerHTML = '';
+    conversations.forEach((chat) => {
+      const item = document.createElement('div');
+      item.className = `chat-item ${chat.id === activeChatId ? 'active' : ''}`;
+      item.innerHTML = `
+        <span class="chat-item-dot"></span>
+        <span class="chat-item-title">${chat.title}</span>
+        <span class="chat-item-time">${getTimeAgoLabel(chat.updated_at)}</span>
+      `;
+      item.addEventListener('click', () => switchConversation(chat.id));
+      container.appendChild(item);
+    });
+  }
+
+  function updateActiveChatDisplay() {
+    const activeChat = conversations.find(c => c.id === activeChatId);
+    const titleEl = document.getElementById('active-chat-title');
+    if (titleEl && activeChat) {
+      titleEl.textContent = activeChat.title;
+    }
+  }
+
+  function createNewConversation() {
+    const newId = 'chat-' + Date.now();
+    const newChat = {
+      id: newId,
+      title: 'Untitled Chat',
+      updated_at: Date.now(),
+      turns: []
+    };
+    conversations.unshift(newChat);
+    activeChatId = newId;
+    saveConversations();
+    renderSidebarRecentChats();
+    updateActiveChatDisplay();
+    clearStreamCanvas();
+  }
+
+  function switchConversation(id) {
+    const chat = conversations.find(c => c.id === id);
+    if (!chat) return;
+    activeChatId = id;
+    renderSidebarRecentChats();
+    updateActiveChatDisplay();
+    clearStreamCanvas();
+
+    if (chat.turns && chat.turns.length) {
+      chat.turns.forEach(turn => {
+        renderStatementInStream(turn.sender, turn.text, false);
+      });
+    }
+  }
+
+  function clearStreamCanvas() {
+    if (chatFeed) {
+      chatFeed.innerHTML = '<div id="chat-empty"></div>';
+      chatFeed.style.display = 'none';
+    }
+    if (dialogueCenterpiece) {
+      dialogueCenterpiece.style.display = 'flex';
+    }
+    hasConversationStarted = false;
+  }
+
+  const activeTitleEl = document.getElementById('active-chat-title');
+  if (activeTitleEl) {
+    activeTitleEl.addEventListener('blur', () => {
+      const newTitle = activeTitleEl.textContent.trim() || 'Untitled Chat';
+      const chat = conversations.find(c => c.id === activeChatId);
+      if (chat) {
+        chat.title = newTitle;
+        saveConversations();
+        renderSidebarRecentChats();
+      }
+    });
+
+    activeTitleEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        activeTitleEl.blur();
+      }
+    });
+  }
+
+  const btnNewChat = document.getElementById('btn-new-chat');
+  if (btnNewChat) {
+    btnNewChat.addEventListener('click', createNewConversation);
+  }
+
+
   // ── Initialization ─────────────────────────────────────────────
 
   async function init() {
@@ -1420,8 +1685,22 @@
 
     reportWorkshopFocus(!document.hidden && (document.hasFocus ? document.hasFocus() : true));
     refreshModelsList();
-    initVoice();
+    if (typeof initVoice === 'function') initVoice();
     initWebSocket();
+    initParticleCanvas();
+    loadConversations();
+
+    // Sidebar collapse toggle
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const appSidebar = document.getElementById('app-sidebar');
+    if (btnToggleSidebar && appSidebar) {
+      btnToggleSidebar.addEventListener('click', () => {
+        appSidebar.classList.toggle('sidebar-collapsed');
+        // Update CSS variable for drawer overlay positioning
+        const isCollapsed = appSidebar.classList.contains('sidebar-collapsed');
+        document.documentElement.style.setProperty('--sidebar-w', isCollapsed ? '58px' : '240px');
+      });
+    }
   }
 
   init();
