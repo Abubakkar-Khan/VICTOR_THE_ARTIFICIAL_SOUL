@@ -13,6 +13,13 @@ root_dir = Path(__file__).resolve().parent.parent
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
+# When compiled with console=False, sys.stdout and sys.stderr are None.
+# Redirect to devnull to prevent crashes in libraries trying to write to them.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import uvicorn
 from victor.desktop.mascot import launch_desktop_mascot
 
@@ -66,8 +73,12 @@ def wait_for_server(port: int, max_wait: float = 20.0) -> bool:
 def start_api_server(port: int):
     """Run uvicorn FastAPI server in background thread."""
     try:
+        if sys.stdout is None:
+            sys.stdout = open(os.devnull, "w", encoding="utf-8")
+        if sys.stderr is None:
+            sys.stderr = open(os.devnull, "w", encoding="utf-8")
         from victor.api.server import app
-        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", log_config=None)
         server = uvicorn.Server(config)
         server.run()
     except Exception as ex:

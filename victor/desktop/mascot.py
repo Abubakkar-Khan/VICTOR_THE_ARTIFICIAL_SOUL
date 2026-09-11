@@ -43,28 +43,38 @@ except ImportError:
     HAS_AUDIO = False
 
 
-# ── 8 Artificial Soul Emotions (Zero Emojis) ───────────────────────
+# ── 12 Dexter Soul Emotions (Zero Emojis) ──────────────────────────
 
 EMOTIONS = {
     "neutral":   {"label": "Neutral",   "desc": "Standing by. Calm and level-headed."},
     "happy":     {"label": "Happy",     "desc": "Optimal resonance. Systems running cleanly."},
     "curious":   {"label": "Curious",   "desc": "Observing closely. Exploring telemetry."},
     "idle":      {"label": "Idle",      "desc": "Deep standby. Drifting quietly."},
+    "bored":     {"label": "Bored",     "desc": "Waiting patiently for something."},
     "thinking":  {"label": "Thinking",  "desc": "Synthesizing reasoning vectors."},
+    "searching": {"label": "Searching", "desc": "Looking through information and files."},
     "excited":   {"label": "Excited",   "desc": "Fascinating discovery! High neural resonance."},
+    "eureka":    {"label": "Eureka",    "desc": "Figured something out!"},
     "confused":  {"label": "Confused",  "desc": "Ambiguous vector. Clarification required."},
     "concerned": {"label": "Concerned", "desc": "Anomaly detected. Proceeding with caution."},
+    "listening": {"label": "Listening", "desc": "Receiving your voice or input."},
+    "skeptical": {"label": "Skeptical", "desc": "Double-checking parameters carefully."},
 }
 
 EMOTION_ACCENTS = {
     "neutral":   "#D4A574",
     "happy":     "#10B981",
     "curious":   "#F59E0B",
+    "idle":      "#64748B",
+    "bored":     "#71717A",
     "thinking":  "#38BDF8",
+    "searching": "#06B6D4",
     "excited":   "#FBBF24",
+    "eureka":    "#FACC15",
     "confused":  "#C084FC",
     "concerned": "#EF4444",
-    "idle":      "#64748B",
+    "listening": "#22C55E",
+    "skeptical": "#FB923C",
 }
 
 PENTATONIC_SCALE = [523, 587, 659, 784, 880, 1046]  # C5, D5, E5, G5, A5, C6
@@ -177,8 +187,8 @@ class MascotWindow:
         else:
             base_dir = Path(__file__).resolve().parent.parent
         sprite_dir = base_dir / "sprite"
-        target_w = 200
-        target_h = 145
+        target_w = 170
+        target_h = 155
 
         for emo in EMOTIONS.keys():
             path = sprite_dir / f"{emo}.png"

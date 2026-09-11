@@ -59,6 +59,7 @@ cover/
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # Log files
 *.log

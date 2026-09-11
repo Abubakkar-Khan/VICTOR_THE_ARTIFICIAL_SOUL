@@ -11,13 +11,18 @@
 
   const EMOTIONS = {
     neutral:   { label: 'NEUTRAL',   sprite: '/static/sprites/neutral.png',   desc: 'Standing by. Calm and level-headed.' },
-    happy:     { label: 'HAPPY',     sprite: '/static/sprites/happy.png',     desc: 'Optimal resonance. Systems running cleanly.' },
-    curious:   { label: 'CURIOUS',   sprite: '/static/sprites/curious.png',   desc: 'Observing closely. Exploring telemetry.' },
-    idle:      { label: 'IDLE',      sprite: '/static/sprites/idle.png',      desc: 'Deep standby. Drifting quietly.' },
+    happy:     { label: 'HAPPY',     sprite: '/static/sprites/happy.png',     desc: 'Successful / helpful outcome.' },
+    curious:   { label: 'CURIOUS',   sprite: '/static/sprites/curious.png',   desc: 'Exploring and learning.' },
+    idle:      { label: 'IDLE',      sprite: '/static/sprites/idle.png',      desc: 'Relaxed — nothing happening.' },
+    bored:     { label: 'BORED',     sprite: '/static/sprites/bored.png',     desc: 'Waiting patiently for something.' },
     thinking:  { label: 'THINKING',  sprite: '/static/sprites/thinking.png',  desc: 'Synthesizing reasoning vectors.' },
-    excited:   { label: 'EXCITED',   sprite: '/static/sprites/excited.png',   desc: 'Fascinating discovery! High neural resonance.' },
-    confused:  { label: 'CONFUSED',  sprite: '/static/sprites/confused.png',  desc: 'Ambiguous vector. Clarification required.' },
-    concerned: { label: 'CONCERNED', sprite: '/static/sprites/concerned.png', desc: 'Anomaly detected. Proceeding with caution.' }
+    searching: { label: 'SEARCHING', sprite: '/static/sprites/searching.png', desc: 'Looking through information and files.' },
+    excited:   { label: 'EXCITED',   sprite: '/static/sprites/excited.png',   desc: 'Interesting discovery! High resonance.' },
+    eureka:    { label: 'EUREKA',    sprite: '/static/sprites/eureka.png',    desc: 'Figured something out!' },
+    confused:  { label: 'CONFUSED',  sprite: '/static/sprites/confused.png',  desc: 'Unclear request or problem.' },
+    concerned: { label: 'CONCERNED', sprite: '/static/sprites/concerned.png', desc: 'Failure or problem detected.' },
+    listening: { label: 'LISTENING', sprite: '/static/sprites/listening.png', desc: 'Receiving your voice or input.' },
+    skeptical: { label: 'SKEPTICAL', sprite: '/static/sprites/skeptical.png', desc: 'Something doesn\'t seem right / checking.' }
   };
 
 
@@ -113,12 +118,17 @@
       const cues = {
         happy: [659.25, 880.00],
         excited: [587.33, 783.99, 1046.50],
+        eureka: [523.25, 659.25, 783.99, 1046.50],
         curious: [440.00, 659.25],
+        searching: [440.00, 523.25, 659.25],
         thinking: [523.25, 659.25],
         confused: [493.88, 440.00],
         concerned: [440.00, 392.00],
+        listening: [587.33, 659.25],
+        skeptical: [493.88, 523.25, 466.16],
         neutral: [523.25],
-        idle: [392.00]
+        idle: [392.00],
+        bored: [349.23]
       };
 
       const seq = cues[emotion] || [523.25];
@@ -226,7 +236,7 @@
     }
 
     // Emotion Studio buttons in Settings
-    $$('.emotion-btn').forEach(btn => {
+    $$('.emo-preview-btn, .emotion-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.emotion === name);
     });
 
@@ -949,6 +959,23 @@
 
     await refreshModelsList();
   }
+
+  // Emotion Studio preview buttons
+  $$('.emo-preview-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const emo = btn.dataset.emotion;
+      if (emo) {
+        setEmotion(emo, true, true);
+        try {
+          await fetch('/api/emotion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emotion: emo })
+          });
+        } catch (e) {}
+      }
+    });
+  });
 
   // Companion Options Handlers
   if (toggleAutohide) {

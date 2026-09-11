@@ -38,14 +38,19 @@ def strip_emojis(text: str) -> str:
 
 
 EMOTIONS: Dict[str, Dict[str, str]] = {
-    "neutral": {"emoji": "😐", "label": "Neutral", "desc": "Normal interaction"},
-    "happy": {"emoji": "😊", "label": "Happy", "desc": "Successful/helpful outcome"},
-    "curious": {"emoji": "🤔", "label": "Curious", "desc": "Exploring/learning"},
-    "idle": {"emoji": "😴", "label": "Idle", "desc": "Nothing happening"},
-    "thinking": {"emoji": "🧠", "label": "Thinking", "desc": "Processing"},
-    "excited": {"emoji": "😮", "label": "Excited", "desc": "Interesting discovery"},
-    "confused": {"emoji": "😕", "label": "Confused", "desc": "Unclear request/problem"},
-    "concerned": {"emoji": "😔", "label": "Concerned", "desc": "Failure/problem"},
+    "neutral": {"emoji": "", "label": "Neutral", "desc": "Standing by. Calm and level-headed."},
+    "happy": {"emoji": "", "label": "Happy", "desc": "Successful/helpful outcome."},
+    "curious": {"emoji": "", "label": "Curious", "desc": "Exploring/learning."},
+    "idle": {"emoji": "", "label": "Idle", "desc": "Relaxed — nothing happening."},
+    "bored": {"emoji": "", "label": "Bored", "desc": "Waiting for something."},
+    "thinking": {"emoji": "", "label": "Thinking", "desc": "Processing."},
+    "searching": {"emoji": "", "label": "Searching", "desc": "Looking through information/files."},
+    "excited": {"emoji": "", "label": "Excited", "desc": "Interesting discovery."},
+    "eureka": {"emoji": "", "label": "Eureka", "desc": "Figured something out."},
+    "confused": {"emoji": "", "label": "Confused", "desc": "Unclear request/problem."},
+    "concerned": {"emoji": "", "label": "Concerned", "desc": "Failure/problem."},
+    "listening": {"emoji": "", "label": "Listening", "desc": "Receiving user input."},
+    "skeptical": {"emoji": "", "label": "Skeptical", "desc": "Something doesn't seem right / checking."},
 }
 
 
@@ -89,25 +94,37 @@ class VictorAgent:
     def appraise_initial_emotion(self, text: str) -> str:
         """Dynamically appraise emotional resonance based on user input sentiment and intent."""
         lower = text.strip().lower()
-        if any(w in lower for w in ["help", "broken", "fail", "error", "wrong", "cant", "can't", "bug", "issue"]):
+        if any(w in lower for w in ["help", "broken", "fail", "error", "wrong", "cant", "can't", "bug", "issue", "crash"]):
             return "concerned"
-        if any(w in lower for w in ["why", "how", "what", "where", "who", "when", "explore", "search", "check", "?"]):
+        if any(w in lower for w in ["find", "search", "lookup", "grep", "locate", "browse", "google", "query"]):
+            return "searching"
+        if any(w in lower for w in ["eureka", "solved", "fixed", "aha", "got it", "figured it out", "discovery"]):
+            return "eureka"
+        if any(w in lower for w in ["really?", "sure?", "verify", "doubt", "suspicious", "skeptical", "are you sure"]):
+            return "skeptical"
+        if any(w in lower for w in ["why", "how", "what", "where", "who", "when", "explore", "?"]):
             return "curious"
-        if any(w in lower for w in ["awesome", "great", "cool", "wow", "amazing", "eureka", "love"]):
+        if any(w in lower for w in ["awesome", "great", "cool", "wow", "amazing", "love"]):
             return "excited"
+        if any(w in lower for w in ["wait", "bored", "nothing", "sleepy", "slow"]):
+            return "bored"
         if any(w in lower for w in ["hello", "hi", "hey", "greetings", "good morning", "good evening"]):
-            return "neutral"
+            return "happy"
         return "neutral"
 
     async def poke(self) -> Dict[str, Any]:
         """Respond to user poke/click organically without mechanical emotion cycling."""
-        if self.emotion == "idle":
+        if self.emotion in ["idle", "bored"]:
             await self.set_emotion("neutral", reason="Woken by user poke")
             msg = "Awake. Neural systems active."
         elif self.emotion == "thinking":
             msg = "Synthesizing thoughts. Quiet processing."
+        elif self.emotion == "searching":
+            msg = "Scanning telemetry and information channels."
         elif self.emotion == "happy":
             msg = "Systems operational and optimal."
+        elif self.emotion == "eureka":
+            msg = "Insights verified and cataloged."
         elif self.emotion == "curious":
             msg = "Listening closely. What do you need?"
         elif self.emotion == "excited":
@@ -116,6 +133,10 @@ class VictorAgent:
             msg = "Recalibrating semantic vectors."
         elif self.emotion == "concerned":
             msg = "Monitoring anomalies. Proceeding with care."
+        elif self.emotion == "listening":
+            msg = "Receiving input. Go ahead."
+        elif self.emotion == "skeptical":
+            msg = "Double-checking parameters and constraints."
         else:
             msg = "Standing by. What would you like to do?"
 
@@ -325,7 +346,10 @@ class VictorAgent:
             step = task.add_step(name=tool_name, tool=tool_name)
             step.status = "running"
 
-            await self.set_emotion("thinking", reason=f"Executing {tool_name}")
+            if tool_name in ["web_search", "youtube", "browser", "filesystem"]:
+                await self.set_emotion("searching", reason=f"Executing {tool_name}")
+            else:
+                await self.set_emotion("thinking", reason=f"Executing {tool_name}")
             await self.event_bus.emit("agent.state", state="working")
             await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
             result: ToolResult = await self.registry.execute_tool(tool_name, **parameters)
@@ -336,7 +360,7 @@ class VictorAgent:
                 step.output = str(result.output)[:200]
                 await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
                 if tool_name in ["web_search", "youtube", "browser"]:
-                    await self.set_emotion("excited", reason="Discovered live web information")
+                    await self.set_emotion("eureka" if any(w in user_message.lower() for w in ["find", "search", "solve", "how", "what", "where"]) else "excited", reason="Discovered live web information")
                 else:
                     await self.set_emotion("happy", reason="Action succeeded")
             else:
