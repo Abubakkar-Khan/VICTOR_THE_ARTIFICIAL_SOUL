@@ -19,8 +19,8 @@ class FilesystemTool(BaseTool):
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["read", "search", "list", "open", "create_folder", "create_file", "rename_file", "move_file", "copy_file"],
-                "description": "Action to perform on the filesystem."
+                "enum": ["read", "search", "list", "open", "create_folder", "create_file", "edit", "append", "rename_file", "move_file", "copy_file"],
+                "description": "Action to perform on the filesystem (OpenClaw file standards)."
             },
             "path": {
                 "type": "string",
@@ -34,9 +34,17 @@ class FilesystemTool(BaseTool):
                 "type": "string",
                 "description": "New name for rename_file."
             },
+            "old_text": {
+                "type": "string",
+                "description": "Target text to be replaced for edit action."
+            },
+            "new_text": {
+                "type": "string",
+                "description": "Replacement text for edit action."
+            },
             "content": {
                 "type": "string",
-                "description": "Text content for create_file."
+                "description": "Text content for create_file or append."
             },
             "query": {
                 "type": "string",
@@ -319,6 +327,45 @@ class FilesystemTool(BaseTool):
                 "status": "copied"
             }
 
+        elif action == "edit":
+            old_text = kwargs.get("old_text", "")
+            new_text = kwargs.get("new_text", "")
+            if not path.strip():
+                raise ValueError("Path is required for edit action.")
+            resolved_path = Path(self._resolve_special_path(path))
+            if not resolved_path.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+            if not self._is_safe_path(resolved_path):
+                raise PermissionError(f"Access denied: Path '{path}' is outside allowed directory roots.")
+            content = resolved_path.read_text(encoding="utf-8")
+            if old_text not in content:
+                raise ValueError(f"Target text '{old_text[:50]}' not found in '{path}'.")
+            updated = content.replace(old_text, new_text, 1)
+            resolved_path.write_text(updated, encoding="utf-8")
+            return {
+                "action": "edit",
+                "path": str(resolved_path),
+                "status": "edited",
+                "replacements": 1
+            }
+
+        elif action == "append":
+            content_to_add = kwargs.get("content", "")
+            if not path.strip():
+                raise ValueError("Path is required for append action.")
+            resolved_path = Path(self._resolve_special_path(path))
+            if not resolved_path.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+            if not self._is_safe_path(resolved_path):
+                raise PermissionError(f"Access denied: Path '{path}' is outside allowed directory roots.")
+            with open(resolved_path, "a", encoding="utf-8") as f:
+                f.write(content_to_add)
+            return {
+                "action": "append",
+                "path": str(resolved_path),
+                "status": "appended"
+            }
+
         else:
             raise ValueError(f"Unknown action: {action}")
 
@@ -385,6 +432,21 @@ class FilesystemTool(BaseTool):
         def extract_copy(m) -> dict:
             return {"action": "copy_file", "path": m.group(1).strip(), "destination": m.group(2).strip()}
 
+        def extract_edit(m) -> dict:
+            return {
+                "action": "edit",
+                "path": m.group(1).strip(),
+                "old_text": m.group(2),
+                "new_text": m.group(3)
+            }
+
+        def extract_append(m) -> dict:
+            return {
+                "action": "append",
+                "path": m.group(1).strip(),
+                "content": m.group(2)
+            }
+
         return [
             {"pattern": r"^(?:read(?:\s+file)?|inspect(?:\s+file)?|view(?:\s+file)?|show(?:\s+file)?)\s+([a-zA-Z0-9_\-\.\/\\~]+)$", "extract": extract_read},
             {"pattern": r"^(?:search\s+(?:my\s+)?(?:computer|pc)\s+(?:for\s+)?(?:a\s+)?files?\s*(?:named|called)?|search\s+for\s+files?\s+(?:named|called)|find\s+(?:a\s+)?files?\s+(?:named|called)|find\s+file)\s+(.+)$", "extract": extract_search},
@@ -392,6 +454,8 @@ class FilesystemTool(BaseTool):
             {"pattern": r"^(?:create|make|touch)\s+(?:a\s+)?(?:new\s+)?(?:folder|directory)\b\s*(.*)$", "extract": extract_create_folder},
             {"pattern": r"^(?:create|make|touch)\s+(?:a\s+)?(?:new\s+)?files?\b\s*(.*)$", "extract": extract_create_file},
             {"pattern": r"^(?:create|make|touch)\s+([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)$", "extract": extract_create_file},
+            {"pattern": r"^(?:edit|modify)\s+(?:file\s+)?([^\s]+)\s+replace\s+[\"'](.+?)[\"']\s+with\s+[\"'](.+?)[\"']$", "extract": extract_edit},
+            {"pattern": r"^(?:append\s+to|add\s+to)\s+(?:file\s+)?([^\s]+)\s+(.+)$", "extract": extract_append},
             {"pattern": r"^(?:rename(?:\s+file)?)\s+(.+)\s+to\s+(.+)$", "extract": extract_rename},
             {"pattern": r"^(?:move(?:\s+file)?)\s+(.+)\s+to\s+(.+)$", "extract": extract_move},
             {"pattern": r"^(?:copy(?:\s+file)?)\s+(.+)\s+to\s+(.+)$", "extract": extract_copy},
@@ -429,6 +493,10 @@ class FilesystemTool(BaseTool):
                 return f"Created folder `{out.get('path')}`."
             elif action == "create_file":
                 return f"Created file `{out.get('path')}`."
+            elif action == "edit":
+                return f"Edited `{out.get('path')}`."
+            elif action == "append":
+                return f"Appended content to `{out.get('path')}`."
             elif action == "rename_file":
                 return f"Renamed `{out.get('old_path')}` to `{out.get('new_path')}`."
             elif action == "move_file":

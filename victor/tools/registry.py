@@ -13,15 +13,20 @@ class ToolRegistry:
         self._slash_commands: Dict[str, BaseTool] = {}
         self.security = security_config or SecurityConfig()
 
-    def register(self, tool: BaseTool) -> BaseTool:
-        """Register a tool instance."""
+    def register(self, tool: BaseTool, aliases: Optional[List[str]] = None) -> BaseTool:
+        """Register a tool instance and optional slash command aliases."""
         self._tools[tool.name] = tool
         if tool.slash_command:
-            # normalize command, e.g. /calc
             cmd = tool.slash_command.lower()
             if not cmd.startswith("/"):
                 cmd = f"/{cmd}"
             self._slash_commands[cmd] = tool
+        if aliases:
+            for a in aliases:
+                a_clean = a.lower().strip()
+                if not a_clean.startswith("/"):
+                    a_clean = f"/{a_clean}"
+                self._slash_commands[a_clean] = tool
         return tool
 
     def get(self, name: str) -> Optional[BaseTool]:

@@ -64,10 +64,16 @@ class PermissionManager:
         "applications.list": PermissionLevel.SAFE,
         "applications.open": PermissionLevel.SAFE,
         "notifications.send": PermissionLevel.SAFE,
+        "web_fetch": PermissionLevel.SAFE,
+        "process.list": PermissionLevel.SAFE,
+        "process.status": PermissionLevel.SAFE,
 
         # Requires confirmation
         "filesystem.write": PermissionLevel.REQUIRES_CONFIRMATION,
         "filesystem.delete": PermissionLevel.REQUIRES_CONFIRMATION,
+        "filesystem.edit": PermissionLevel.REQUIRES_CONFIRMATION,
+        "filesystem.append": PermissionLevel.REQUIRES_CONFIRMATION,
+        "process.kill": PermissionLevel.REQUIRES_CONFIRMATION,
         "computer.click": PermissionLevel.REQUIRES_CONFIRMATION,
         "computer.type": PermissionLevel.REQUIRES_CONFIRMATION,
         "computer.hotkey": PermissionLevel.REQUIRES_CONFIRMATION,
@@ -89,7 +95,8 @@ class PermissionManager:
         "filesystem.create_folder": PermissionLevel.REQUIRES_CONFIRMATION,
         "applications.close": PermissionLevel.REQUIRES_CONFIRMATION,
 
-        # Restricted
+        # Controlled / Restricted
+        "exec.execute": PermissionLevel.RESTRICTED,
         "shell.execute": PermissionLevel.RESTRICTED,
         "system.shutdown": PermissionLevel.RESTRICTED,
     }

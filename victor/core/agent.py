@@ -12,6 +12,7 @@ from victor.models.base import BaseLLM, ChatMessage
 from victor.models.factory import create_model_provider
 from victor.permissions.manager import PermissionManager
 from victor.tasks.manager import TaskManager
+from victor.skills.manager import SkillManager
 from victor.tools.base import ToolResult
 from victor.tools.factory import create_tool_registry
 from victor.tools.registry import ToolRegistry
@@ -66,6 +67,7 @@ class VictorAgent:
         memory: Optional[MemoryStore] = None,
         permissions: Optional[PermissionManager] = None,
         tasks: Optional[TaskManager] = None,
+        skills: Optional[SkillManager] = None,
     ):
         self.config = config or load_config()
         self.llm = llm or create_model_provider(self.config.model)
@@ -75,6 +77,7 @@ class VictorAgent:
         self.memory = memory or MemoryStore()
         self.permissions = permissions or PermissionManager()
         self.tasks = tasks or TaskManager(memory_store=self.memory)
+        self.skills = skills or SkillManager()
         self.router = ToolRouter(self.registry)
         self.history: List[ChatMessage] = []
         self.emotion: str = "idle"
@@ -155,6 +158,10 @@ class VictorAgent:
         if mem_summary:
             prompt_parts.append(mem_summary)
 
+        skills_prompt = self.skills.get_prompt_injection()
+        if skills_prompt:
+            prompt_parts.append(skills_prompt)
+
         current_emo = EMOTIONS.get(self.emotion, EMOTIONS["neutral"])
         prompt_parts.append(
             f"## Artificial Soul & Emotional State\n"
@@ -217,11 +224,16 @@ class VictorAgent:
         if command in ["/help", "/commands"]:
             lines = [
                 "Available commands:",
-                "  /tools  — List available tools",
-                "  /calc <expr>  — Calculate something",
+                "  /tools  — List registered tools categorized (OpenClaw standard)",
+                "  /skills  — List active skills and instruction packs",
+                "  /skill <name>  — View instructions for a specific skill",
+                "  /exec <cmd>  — Run shell / PowerShell command",
+                "  /process [list|kill <target>|status <pid>]  — Inspect or kill processes",
                 "  /search <query>  — Search the web",
-                "  /browse <url>  — Read a webpage",
-                "  /file <path>  — Read a local file",
+                "  /fetch <url>  — Extract readable text from webpage",
+                "  /file <path>  — Read or inspect a local file",
+                "  /window <list|focus|minimize|maximize|close>  — Control windows",
+                "  /calc <expr>  — Calculate an expression",
                 "  /info  — System info",
                 "  /clear  — Clear conversation",
             ]
@@ -230,11 +242,61 @@ class VictorAgent:
             return {"type": "command_result", "content": output_text, "tool_executed": None}
 
         if command == "/tools":
-            lines = [f"{len(self.registry.list_tools())} tools available:"]
-            for tool in self.registry.list_tools():
-                slash = f" ({tool.slash_command})" if tool.slash_command else ""
-                lines.append(f"  {tool.name}{slash} — {tool.description}")
+            categories = {
+                "Runtime Execution (OpenClaw)": ["exec", "process"],
+                "Workspace & Files": ["filesystem"],
+                "Web & Research": ["web_search", "web_fetch", "browser", "youtube"],
+                "Desktop Automation": ["applications", "window_manager", "keyboard", "screen_observer", "computer"],
+                "Utilities": ["calculator", "notifications"],
+            }
+            lines = [f"Dexter Toolset ({len(self.registry.list_tools())} tools registered):"]
+            seen = set()
+            for cat_name, tool_names in categories.items():
+                cat_tools = [self.registry.get(t) for t in tool_names if self.registry.get(t)]
+                unique_tools = []
+                for t in cat_tools:
+                    if t.name not in seen:
+                        seen.add(t.name)
+                        unique_tools.append(t)
+                if unique_tools:
+                    lines.append(f"\n[{cat_name}]")
+                    for t in unique_tools:
+                        slash = f" ({t.slash_command})" if t.slash_command else ""
+                        lines.append(f"  {t.name}{slash} — {t.description}")
+            remaining = [t for t in self.registry.list_tools() if t.name not in seen]
+            if remaining:
+                lines.append("\n[Other Tools]")
+                for t in remaining:
+                    slash = f" ({t.slash_command})" if t.slash_command else ""
+                    lines.append(f"  {t.name}{slash} — {t.description}")
             output_text = "\n".join(lines)
+            await self.event_bus.emit("agent.completed", duration=0.0)
+            return {"type": "command_result", "content": output_text, "tool_executed": None}
+
+        if command == "/skills":
+            skills = self.skills.list_skills()
+            if not skills:
+                output_text = "No skills loaded."
+            else:
+                lines = [f"{len(skills)} Active Skills (OpenClaw Standard):"]
+                for s in skills:
+                    lines.append(f"  - {s.name}: {s.description}")
+                lines.append("\nType '/skill <name>' to view specific skill instructions.")
+                output_text = "\n".join(lines)
+            await self.event_bus.emit("agent.completed", duration=0.0)
+            return {"type": "command_result", "content": output_text, "tool_executed": None}
+
+        if command == "/skill":
+            name = argument.strip()
+            if not name:
+                output_text = "Usage: /skill <name>. Type /skills to see available skills."
+            else:
+                skill = self.skills.get_skill(name)
+                if skill:
+                    output_text = f"## Skill: {skill.name}\n{skill.description}\n\n{skill.instructions}"
+                else:
+                    avail = ", ".join(s.name for s in self.skills.list_skills())
+                    output_text = f"Skill '{name}' not found. Available skills: {avail}"
             await self.event_bus.emit("agent.completed", duration=0.0)
             return {"type": "command_result", "content": output_text, "tool_executed": None}
 
@@ -366,8 +428,10 @@ class VictorAgent:
             step = task.add_step(name=tool_name, tool=tool_name)
             step.status = "running"
 
-            if tool_name in ["web_search", "youtube", "browser", "filesystem"]:
+            if tool_name in ["web_search", "youtube", "browser", "web_fetch", "filesystem"]:
                 await self.set_emotion("searching", reason=f"Executing {tool_name}")
+            elif tool_name in ["exec", "shell", "process"]:
+                await self.set_emotion("thinking", reason=f"Executing {tool_name}")
             else:
                 await self.set_emotion("thinking", reason=f"Executing {tool_name}")
             await self.event_bus.emit("agent.state", state="working")
@@ -397,7 +461,7 @@ class VictorAgent:
                 step.status = "completed"
                 step.output = str(result.output)[:200]
                 await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
-                if tool_name in ["web_search", "youtube", "browser"]:
+                if tool_name in ["web_search", "youtube", "browser", "web_fetch"]:
                     await self.set_emotion("eureka" if any(w in user_message.lower() for w in ["find", "search", "solve", "how", "what", "where"]) else "excited", reason="Discovered live web information")
                 else:
                     await self.set_emotion("happy", reason="Action succeeded")
@@ -405,8 +469,8 @@ class VictorAgent:
                 # Check if user explicitly asked for detail
                 wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
                 is_direct_action = (
-                    tool_name in ["applications", "keyboard", "window_manager", "computer"] or
-                    (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file"]) or
+                    tool_name in ["applications", "keyboard", "window_manager", "computer", "exec", "shell", "process"] or
+                    (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file", "edit", "append"]) or
                     (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
                 )
 
@@ -487,8 +551,8 @@ class VictorAgent:
                     await self.set_emotion("happy", reason=f"{tool_name} completed successfully")
 
                     is_direct_action = (
-                        tool_name in ["applications", "keyboard", "window_manager", "computer"] or
-                        (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file"]) or
+                        tool_name in ["applications", "keyboard", "window_manager", "computer", "exec", "shell", "process"] or
+                        (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file", "edit", "append"]) or
                         (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
                     )
 

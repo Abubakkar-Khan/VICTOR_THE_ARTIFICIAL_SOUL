@@ -101,12 +101,33 @@ class WindowManagerTool(BaseTool):
         ]
 
     async def run(self, **kwargs) -> Any:
-        action = kwargs.get("action")
-        if action == "list_windows":
-            windows = _list_windows()
-            return {"status": "success", "action": action, "windows": windows}
-            
+        action = kwargs.get("action") or "list_windows"
+        action = action.strip()
         title = kwargs.get("title", "")
+
+        # Handle composite action strings from slash commands e.g. /window minimize chrome
+        if " " in action:
+            parts = action.split(maxsplit=1)
+            verb = parts[0].lower()
+            rest = parts[1].strip()
+            verb_map = {
+                "list": "list_windows",
+                "focus": "focus_window",
+                "switch": "focus_window",
+                "minimize": "minimize",
+                "maximize": "maximize",
+                "restore": "restore",
+                "close": "close_window",
+            }
+            if verb in verb_map:
+                action = verb_map[verb]
+                if not title:
+                    title = rest
+
+        if action in ["list", "list_windows"]:
+            windows = _list_windows()
+            return {"status": "success", "action": "list_windows", "windows": windows}
+            
         if not title:
             return {"status": "error", "message": "Window title required"}
             

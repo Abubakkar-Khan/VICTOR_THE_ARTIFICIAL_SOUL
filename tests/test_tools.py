@@ -204,3 +204,97 @@ async def test_tool_router_pc_intents():
     assert f_match[1]["action"] == "search"
     assert f_match[1]["query"] == "report.pdf"
 
+
+@pytest.mark.asyncio
+async def test_exec_tool_echo():
+    from victor.tools.shell import ExecTool
+    tool = ExecTool()
+    res = await tool.execute(command="echo OpenClaw-Test")
+    assert res.success is True
+    assert "OpenClaw-Test" in res.output["stdout"]
+    assert res.output["exit_code"] == 0
+    formatted = tool.format_display(res)
+    assert "OpenClaw-Test" in formatted
+
+
+@pytest.mark.asyncio
+async def test_process_tool_list():
+    from victor.tools.process import ProcessTool
+    tool = ProcessTool()
+    res = await tool.execute(action="list")
+    assert res.success is True
+    assert res.output["action"] == "list"
+    assert "processes" in res.output
+    assert isinstance(res.output["processes"], list)
+
+
+@pytest.mark.asyncio
+async def test_process_tool_status():
+    from victor.tools.process import ProcessTool
+    tool = ProcessTool()
+    res = await tool.execute(action="status", target="nonexistent_process_xyz_12345")
+    assert res.success is True
+    assert res.output["running"] is False
+
+
+@pytest.mark.asyncio
+async def test_filesystem_tool_edit_and_append(tmp_path):
+    from victor.tools.filesystem import FilesystemTool
+    f = tmp_path / "sample.txt"
+    f.write_text("line one\nreplace_me_target\nline three\n", encoding="utf-8")
+
+    tool = FilesystemTool(allowed_roots=[str(tmp_path)])
+
+    # Test edit (find-and-replace)
+    edit_res = await tool.execute(
+        action="edit",
+        path=str(f),
+        old_text="replace_me_target",
+        new_text="replaced_success"
+    )
+    assert edit_res.success is True
+    assert edit_res.output["status"] == "edited"
+    assert edit_res.output["replacements"] == 1
+    assert "replaced_success" in f.read_text(encoding="utf-8")
+
+    # Test append
+    append_res = await tool.execute(
+        action="append",
+        path=str(f),
+        content="appended_line_four\n"
+    )
+    assert append_res.success is True
+    assert append_res.output["status"] == "appended"
+    assert "appended_line_four" in f.read_text(encoding="utf-8")
+
+
+def test_skill_manager_discovery(tmp_path):
+    from victor.skills.manager import SkillManager
+    # Setup mock workspace skill
+    skill_dir = tmp_path / "skills" / "test-skill"
+    skill_dir.mkdir(parents=True)
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(
+        "---\n"
+        "name: test-automation\n"
+        "description: Automated testing skill for OpenClaw.\n"
+        "---\n"
+        "Step 1: Run pytest\n"
+        "Step 2: Check coverage\n",
+        encoding="utf-8"
+    )
+
+    manager = SkillManager(workspace_dir=str(tmp_path))
+    skills = manager.list_skills()
+    assert len(skills) >= 1
+    skill = manager.get_skill("test-automation")
+    assert skill is not None
+    assert skill.name == "test-automation"
+    assert "Automated testing" in skill.description
+    assert "Step 1: Run pytest" in skill.instructions
+
+    prompt = manager.get_prompt_injection()
+    assert "Active Skills" in prompt
+    assert "test-automation" in prompt
+
+

@@ -25,7 +25,7 @@ model:
   max_tokens: 512
 
 security:
-  allow_shell: false
+  allow_shell: true
   allowed_file_roots:
     - "."
     - "~/Desktop"

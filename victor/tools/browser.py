@@ -11,11 +11,11 @@ except ImportError:
     BeautifulSoup = None
 
 
-class BrowserTool(BaseTool):
-    name = "browser"
-    description = "Fetch a webpage by URL and extract clean, readable text content."
-    permission = PermissionLevel.CONTROLLED
-    slash_command = "/browse"
+class WebFetchTool(BaseTool):
+    name = "web_fetch"
+    description = "Fetch a webpage by URL and extract clean, readable text content (OpenClaw web_fetch standard)."
+    permission = PermissionLevel.SAFE
+    slash_command = "/fetch"
     parameters = {
         "type": "object",
         "properties": {
@@ -90,8 +90,9 @@ class BrowserTool(BaseTool):
             return {"url": target}
 
         return [
-            {"pattern": r"https?://[^\s]+", "extract": extract_url},
-            {"pattern": r"^(?:browse|visit|open url)\s+(.+)$", "extract": extract_cmd}
+            {"pattern": r"^(?:fetch|read\s+url|read\s+webpage|scrape|get\s+page)\s+(.+)$", "extract": extract_cmd},
+            {"pattern": r"^(?:browse|visit|open url)\s+(.+)$", "extract": extract_cmd},
+            {"pattern": r"https?://[^\s]+", "extract": extract_url}
         ]
 
     def format_display(self, result) -> str:
@@ -102,6 +103,13 @@ class BrowserTool(BaseTool):
             title = out.get("title", "")
             url = out.get("url", "")
             content = out.get("content", "")
-            return f"Here is the relevant content from [{title}]({url}):\n\n{content[:700]}..."
+            return f"Content from [{title}]({url}):\n\n{content[:1200]}..."
         return str(out)
+
+
+class BrowserTool(WebFetchTool):
+    """Backwards-compatible alias for BrowserTool referencing WebFetchTool."""
+    name = "browser"
+    slash_command = "/browse"
+
 
