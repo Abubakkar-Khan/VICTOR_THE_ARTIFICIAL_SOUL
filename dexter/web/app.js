@@ -251,6 +251,7 @@
   const selectClickAction = $('#select-click-action');
   const selectDialogTheme = $('#select-dialog-theme');
   const shellStatus = $('#shell-status');
+  const toggleShellPermission = $('#toggle-shell-permission');
 
   const permModal = $('#permission-modal');
   const permDesc = $('#perm-desc');
@@ -332,6 +333,7 @@
   // ── Unified Voice Input & Speech-to-Text (Click-to-Listen) ─────
   let isListeningVoice = false;
   let speechRecognitionInstance = null;
+  let voiceDebounceTimer = null;
 
   async function toggleVoiceListening() {
     if (isListeningVoice) {
@@ -353,31 +355,55 @@
         const recognition = new SpeechRec();
         speechRecognitionInstance = recognition;
         recognition.lang = 'en-US';
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
 
+        let accumulatedTranscript = '';
+
+        const scheduleCommit = (delay = 1800) => {
+          if (voiceDebounceTimer) clearTimeout(voiceDebounceTimer);
+          voiceDebounceTimer = setTimeout(() => {
+            const finalClean = (accumulatedTranscript || (chatInput ? chatInput.value : '')).trim();
+            if (finalClean) {
+              if (chatInput) chatInput.value = finalClean;
+              stopVoiceListening();
+              synth.playBlip(1046.50);
+              sendMessage();
+            } else {
+              stopVoiceListening();
+            }
+          }, delay);
+        };
+
         recognition.onresult = (event) => {
-          let transcript = '';
+          let interim = '';
           for (let i = event.resultIndex; i < event.results.length; ++i) {
-            transcript += event.results[i][0].transcript;
+            const res = event.results[i];
+            if (res.isFinal) {
+              accumulatedTranscript += (accumulatedTranscript ? ' ' : '') + res[0].transcript.trim();
+            } else {
+              interim += res[0].transcript;
+            }
           }
-          if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = `"${transcript}"`;
-          if (event.results[0] && event.results[0].isFinal) {
-            if (chatInput) chatInput.value = transcript.trim();
-            stopVoiceListening();
-            synth.playBlip(1046.50);
-            sendMessage();
-          }
+          const display = (accumulatedTranscript + (interim ? ' ' + interim : '')).trim();
+          if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = `"${display}"`;
+          if (chatInput && display) chatInput.value = display;
+
+          // Debounce: Wait 1.8s of silence after speaking before concluding and sending
+          scheduleCommit(1800);
         };
 
         recognition.onerror = (e) => {
+          if (voiceDebounceTimer) clearTimeout(voiceDebounceTimer);
           console.warn('Browser SpeechRecognition error, falling back to hardware mic:', e);
           fallbackBackendListen();
         };
 
         recognition.onend = () => {
           if (isListeningVoice) {
-            stopVoiceListening();
+            if (!voiceDebounceTimer) {
+              stopVoiceListening();
+            }
           }
         };
 
@@ -405,7 +431,7 @@
         setTimeout(() => {
           stopVoiceListening();
           sendMessage();
-        }, 350);
+        }, 500);
       } else {
         if (voiceTranscriptPreview) voiceTranscriptPreview.textContent = data.message || "Didn't catch that. Click mic to speak.";
         setTimeout(() => stopVoiceListening(), 1800);
@@ -418,6 +444,10 @@
 
   function stopVoiceListening() {
     isListeningVoice = false;
+    if (voiceDebounceTimer) {
+      clearTimeout(voiceDebounceTimer);
+      voiceDebounceTimer = null;
+    }
     if (speechRecognitionInstance) {
       try { speechRecognitionInstance.stop(); } catch (e) {}
       speechRecognitionInstance = null;
@@ -626,10 +656,7 @@
     if (sender === 'You') {
       const userTurn = document.createElement('div');
       userTurn.className = 'msg-turn-user';
-      userTurn.innerHTML = `
-        <span class="user-badge">[ YOU ]</span>
-        <div class="user-text">${formatMarkdown(clean)}</div>
-      `;
+      userTurn.innerHTML = `<div class="user-text">${formatMarkdown(clean)}</div>`;
       chatFeed.appendChild(userTurn);
       scrollToBottom();
       return;
@@ -644,11 +671,6 @@
 
     const botTurn = document.createElement('div');
     botTurn.className = 'msg-turn-dexter latest-statement';
-
-    const badge = document.createElement('span');
-    badge.className = 'dexter-badge';
-    badge.textContent = `[ DEXTER // ${currentEmotion.toUpperCase()} ]`;
-    botTurn.appendChild(badge);
 
     const body = document.createElement('div');
     body.className = 'dexter-text';
@@ -692,12 +714,12 @@
     }
 
     const el = document.createElement('div');
-    el.className = 'msg-turn-dexter thinking';
+    el.className = 'msg-turn-dexter thinking latest-statement';
     el.id = 'active-thinking-bubble';
 
     const body = document.createElement('div');
     body.className = 'dexter-text';
-    body.innerHTML = '<span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>';
+    body.innerHTML = 'Thinking... <span class="cursor-block">&#9608;</span>';
     el.appendChild(body);
 
     chatFeed.appendChild(el);
@@ -1128,9 +1150,43 @@
           selectDialogTheme.value = data.companion_options.dialog_theme;
         }
       }
+    try {
+      const secRes = await fetch('/api/settings/security');
+      const secData = await secRes.json();
+      if (toggleShellPermission) {
+        toggleShellPermission.classList.toggle('on', !!secData.allow_shell);
+      }
+      if (shellStatus) {
+        shellStatus.textContent = secData.allow_shell ? 'ENABLED' : 'DISABLED';
+      }
     } catch (e) {}
 
     await refreshModelsList();
+  }
+
+  // Shell Permission Interactive Toggle
+  if (toggleShellPermission) {
+    toggleShellPermission.addEventListener('click', async () => {
+      const isCurrentlyOn = toggleShellPermission.classList.contains('on');
+      const newState = !isCurrentlyOn;
+      toggleShellPermission.classList.toggle('on', newState);
+      try {
+        const res = await fetch('/api/settings/security', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allow_shell: newState })
+        });
+        const data = await res.json();
+        const active = !!data.allow_shell;
+        toggleShellPermission.classList.toggle('on', active);
+        if (shellStatus) {
+          shellStatus.textContent = active ? 'ENABLED' : 'DISABLED';
+        }
+      } catch (e) {
+        console.error('Failed to update shell permission:', e);
+        toggleShellPermission.classList.toggle('on', isCurrentlyOn);
+      }
+    });
   }
 
   // Emotion Studio preview buttons
@@ -1395,8 +1451,8 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const cellSize = 10; // Pixel size for each discrete cell
-    const cellGap = 1;   // Gap between grid cells
+    const cellSize = 26; // Pixel size for each discrete cell (ultra-lightweight grid)
+    const cellGap = 2;   // Gap between grid cells
     let cols = 0;
     let rows = 0;
     let grid = null;     // 1D array of cell states: 1 = alive, 0 = dead
@@ -1406,9 +1462,9 @@
       const total = cols * rows;
       grid = new Uint8Array(total);
       alphaGrid = new Float32Array(total);
-      // Seed ~7% of cells randomly to start a calm living simulation
+      // Seed ~4.5% of cells randomly to start a calm living simulation
       for (let i = 0; i < total; i++) {
-        if (Math.random() < 0.07) {
+        if (Math.random() < 0.045) {
           grid[i] = 1;
           alphaGrid[i] = Math.random() * 0.6 + 0.4;
         }
@@ -1468,23 +1524,26 @@
     function getAccentRgb() {
       const emo = currentEmotion || 'neutral';
       const map = {
-        happy: '255, 107, 0',
+        neutral: '255, 107, 0',
+        happy: '255, 140, 0',
         thinking: '245, 158, 11',
-        curious: '0, 240, 255',
+        curious: '251, 146, 60',
         excited: '255, 85, 0',
         eureka: '250, 204, 21',
         confused: '234, 179, 8',
         concerned: '239, 68, 68',
-        listening: '16, 185, 129',
-        searching: '6, 182, 212',
-        skeptical: '251, 146, 60'
+        listening: '255, 107, 0',
+        searching: '249, 115, 22',
+        skeptical: '251, 146, 60',
+        idle: '255, 107, 0',
+        bored: '217, 119, 6'
       };
-      return map[emo] || '56, 189, 248';
+      return map[emo] || '255, 107, 0';
     }
 
     // Step cellular automata generation (Conway B3/S23)
     let lastStepTime = 0;
-    const stepInterval = 160; // ~6 updates per second for smooth, contemplative life
+    const stepInterval = 280; // ~3.5 updates per second for calm, contemplative life
     let generationCount = 0;
 
     function stepAutomata() {

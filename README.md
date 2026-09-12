@@ -10,11 +10,17 @@ Dexter operates as a quiet, typography-first assistant on your desktop. Running 
 
 - [Overview](#overview)
 - [Key Features](#key-features)
-- [Architecture & Repository Structure](#architecture--repository-structure)
+- [System Architecture](#system-architecture)
+- [Processing Pipeline & Execution Flow](#processing-pipeline--execution-flow)
+- [Repository Structure](#repository-structure)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Running Dexter](#running-dexter)
 - [Tools Reference](#tools-reference)
+  - [Multi-Stage Binary Resolution Logic](#multi-stage-binary-resolution-logic)
+  - [Screen Understanding & UI Automation Logic](#screen-understanding--ui-automation-logic)
+- [Security & Permission Boundary](#security--permission-boundary)
+- [Living Emotional State Machine](#living-emotional-state-machine)
 - [Slash Commands](#slash-commands)
 - [Skills System (OpenClaw Standard)](#skills-system-openclaw-standard)
 - [Configuration Guide (`config/dexter.yaml`)](#configuration-guide-configdexteryaml)
@@ -72,7 +78,136 @@ Dexter bridges conversational AI with deterministic operating system control. Tr
 
 ---
 
-## Architecture & Repository Structure
+## System Architecture
+
+Dexter separates high-level language cognition from low-level operating system execution. The host environment, tool ecosystem, permission guardrails, and model engines communicate through an event-driven orchestrator:
+
+```mermaid
+flowchart TB
+    subgraph Clients["Client Interfaces"]
+        WEB["Web Workshop UI<br/>(Frosted Glass Dock + Cellular Automata)"]
+        CLI["Command-Line Interface<br/>(Interactive REPL)"]
+        DESKTOP["Desktop Mascot Companion<br/>(Tkinter Pixel-Art Widget)"]
+        EXT["External / Script Clients<br/>(REST & WebSockets)"]
+    end
+
+    subgraph Transport["Transport & Server Layer (FastAPI)"]
+        REST["REST API Endpoints<br/>(/api/chat, /api/settings, /api/status)"]
+        WS_SRV["WebSocket Hub<br/>(/ws/chat, /ws/events)"]
+        EVENT_BUS["Asynchronous Event Bus<br/>(agent.started, tool.completed, emotion)"]
+    end
+
+    subgraph AgentCore["Dexter Core Engine"]
+        ORCH["DexterAgent Orchestrator"]
+        ROUTER["Deterministic Intent Router<br/>(Regex & Semantic Dispatch)"]
+        PERSONALITY["Personality & Emotional State Machine<br/>(13 Dynamic Emotional States)"]
+        SKILLS_MGR["OpenClaw Skills Engine<br/>(Modular Instruction Packs)"]
+        TASK_MGR["Task & Step Manager<br/>(Multi-Turn Workflow Tracking)"]
+    end
+
+    subgraph SecurityLayer["Security & Safety Boundary"]
+        PERM_MGR["Permission Manager<br/>(SAFE / CONTROLLED / DANGEROUS)"]
+        SEC_CONFIG["Security Guardrails<br/>(allow_shell, allowed_file_roots)"]
+    end
+
+    subgraph ModelLayer["Language Model Backend"]
+        MODEL_FACTORY["Model Factory"]
+        OLLAMA["Local Ollama Client<br/>(Qwen2:1.5B / Qwen2.5)"]
+        REMOTE["OpenAI-Compatible Remote API"]
+    end
+
+    subgraph Capabilities["Tool & Capability Ecosystem (15 Built-in Tools)"]
+        DESKTOP_TOOLS["Desktop Automation<br/>(applications, window_manager, keyboard, computer, screen_observer)"]
+        FS_TOOLS["Workspace Filesystem<br/>(filesystem read/write/glob/open)"]
+        EXEC_TOOLS["System Execution<br/>(exec, shell, process)"]
+        WEB_TOOLS["Research & Web<br/>(web_search, web_fetch, browser, youtube)"]
+        UTIL_TOOLS["Utilities<br/>(calculator, notifications)"]
+    end
+
+    subgraph HostOS["Host Windows OS (Deterministic Execution)"]
+        WIN32["Win32 User32 / Shell32 APIs<br/>(ctypes SendInput, EnumWindows, ShowWindow)"]
+        UIA["Windows UI Automation<br/>(Accessibility Tree Inspector)"]
+        SUBPROC["Subprocess Pipeline<br/>(PowerShell, cmd.exe)"]
+        SQLITE["SQLite Storage<br/>(dexter_memory.db)"]
+    end
+
+    Clients --> Transport
+    Transport --> ORCH
+    EVENT_BUS -.-> WS_SRV
+    ORCH --> ROUTER
+    ORCH --> PERSONALITY
+    ORCH --> SKILLS_MGR
+    ORCH --> TASK_MGR
+    ORCH --> MODEL_FACTORY
+    MODEL_FACTORY --> OLLAMA
+    MODEL_FACTORY --> REMOTE
+    ROUTER --> PERM_MGR
+    PERM_MGR --> SEC_CONFIG
+    PERM_MGR --> Capabilities
+    Capabilities --> HostOS
+    ORCH --> SQLITE
+```
+
+---
+
+## Processing Pipeline & Execution Flow
+
+Every user prompt traverses a 4-phase deterministic pipeline designed to eliminate hallucinations on small models (1.5B–3B):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Client as Web / Desktop Client
+    participant Server as FastAPI / WebSocket Server
+    participant Agent as DexterAgent Orchestrator
+    participant Router as Intent Router
+    participant Security as Permission Manager
+    participant Tool as Target Tool (Win32 / OS)
+    participant LLM as Local LLM (Ollama 1.5B)
+
+    User->>Client: "Open Chrome and search for documentation"
+    Client->>Server: POST /api/chat or WS send(message)
+    Server->>Agent: process_message(user_input)
+    Agent->>Agent: Transition state -> 'thinking'
+    Agent-->>Server: Emit event 'agent.started'
+    Server-->>Client: Real-time event (Render "Thinking... █")
+
+    rect rgb(28, 32, 42)
+        Note over Agent,Router: Phase 1: Fast Intent Routing (Zero LLM Latency)
+        Agent->>Router: match_intent("Open Chrome and search...")
+        Router-->>Agent: Action identified: applications.open_app(name="chrome", url="...")
+    end
+
+    rect rgb(38, 28, 24)
+        Note over Agent,Security: Phase 2: Security & Permission Check
+        Agent->>Security: check_permission("applications.open_app", params)
+        Security-->>Agent: Allowed (SAFE / Verified Policy)
+    end
+
+    rect rgb(24, 36, 30)
+        Note over Agent,Tool: Phase 3: Deterministic Tool Execution
+        Agent->>Tool: execute(name="chrome", query="documentation")
+        Tool->>Tool: Win32 5-Tier Binary Resolution & os.startfile()
+        Tool-->>Agent: ToolResult(success=True, output="Launched Google Chrome...")
+        Agent-->>Server: Emit event 'tool.completed'
+    end
+
+    rect rgb(36, 28, 44)
+        Note over Agent,LLM: Phase 4: Truth-Grounded Response Synthesis
+        Agent->>LLM: generate(system_prompt, tool_result, emotional_tone)
+        LLM-->>Agent: "Done. I opened Google Chrome with your search."
+    end
+
+    Agent->>Agent: Update emotion -> 'happy' / 'eureka'
+    Agent-->>Server: Response payload (content, emotion, tool_metrics)
+    Server-->>Client: Message Turn + Dynamic Theme Update
+    Client->>User: Display centered response + Blinking cursor block (█)
+```
+
+---
+
+## Repository Structure
 
 ```
 Dexter_The_Artificial_Soul/
@@ -261,15 +396,168 @@ Dexter includes 15 built-in tools organized by OpenClaw capability layers.
 | `calculator` | Utility | AST-based safe mathematical expression evaluation (no `eval`) | Safe | `/calc` | "Calculate 15 * 84", "What is sqrt(144) + 12?", "25% of 800" |
 | `notifications` | Utility | Trigger native Windows desktop toast notifications | Safe | `/notify` | "Notify me to take a break", "Send notification Build completed" |
 
-### Deep-Dive: Multi-Stage Binary Resolution in `applications`
+### Multi-Stage Binary Resolution Logic
 
-The `applications` tool does not rely on simple PATH lookups. It utilizes a 5-tier resolution sequence:
+The `applications` tool does not rely on simple PATH lookups. It utilizes a 5-tier deterministic resolution sequence to ensure applications launch directly into the foreground without flickering terminal wrappers:
 
+```mermaid
+flowchart TD
+    Start(["Input: 'Open VS Code' / 'Launch Chrome'"]) --> AliasCheck["1. Canonical Alias Resolution<br/>('vs code', 'vsc', 'code' -> 'code.exe')"]
+    
+    AliasCheck --> StdPathCheck{"2. Check Standard Paths<br/>(Program Files, LocalAppData, System32)"}
+    
+    StdPathCheck -- "Found Exe" --> VerifyGUI{"Is it a GUI Binary?<br/>(Avoid .cmd / .bat wrappers)"}
+    VerifyGUI -- Yes --> Startfile["5. Launch Clean via os.startfile()<br/>(Zero console popup, foreground focus)"]
+    VerifyGUI -- No --> RegCheck
+    
+    StdPathCheck -- "Not Found" --> RegCheck{"3. Query Windows Registry<br/>(HKCU / HKLM App Paths)"}
+    
+    RegCheck -- "Found in Registry" --> Startfile
+    RegCheck -- "Not Found" --> LnkCheck{"4. Scan Start Menu Shortcuts<br/>(%APPDATA% & %ALLUSERSPROFILE% .lnk files)"}
+    
+    LnkCheck -- "Target Resolved" --> Startfile
+    LnkCheck -- "Not Found" --> ShutilWhich{"PATH Fallback<br/>(shutil.which lookup)"}
+    
+    ShutilWhich -- "Found" --> Startfile
+    ShutilWhich -- "Not Found" --> FailReport["Truth-Driven Error<br/>(Report exact missing binary to user)"]
+
+    Startfile --> Success(["Process Running in Foreground"])
+    FailReport --> ErrorOut(["Truthful Failure Reported"])
+
+    classDef success fill:#1b382b,stroke:#2ea043,stroke-width:2px;
+    classDef failure fill:#3d1d1d,stroke:#f85149,stroke-width:2px;
+    classDef action fill:#21262d,stroke:#30363d,stroke-width:1px;
+    class Success success;
+    class ErrorOut failure;
+    class AliasCheck,Startfile,FailReport action;
+```
+
+Resolution stages:
 1. **Canonical Aliasing**: Maps variations (`"vs code"`, `"visual studio code"`, `"vsc"`, `"code"` -> `"code"`; `"google chrome"` -> `"chrome"`; `"file explorer"` -> `"explorer"`).
 2. **Known Standard Paths**: Prioritizes verified installation directories (e.g. `%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe`, `C:\Program Files\Google\Chrome\Application\chrome.exe`, `C:\Windows\System32\notepad.exe`) to prevent triggering CLI batch wrappers (`.cmd` / `.bat`) that create terminal popups.
 3. **Windows Registry `App Paths`**: Queries `HKCU` and `HKLM \ Software\Microsoft\Windows\CurrentVersion\App Paths` for application-registered executable paths.
 4. **Start Menu Shortcut Scan**: Evaluates `.lnk` shortcut files inside `%APPDATA%\Microsoft\Windows\Start Menu\Programs` and `%ALLUSERSPROFILE%\Microsoft\Windows\Start Menu\Programs`.
 5. **Clean Windows Execution**: Spawns GUI processes using `os.startfile(bin_path, arguments=args)` on Windows, ensuring processes open in the foreground without flickering console windows.
+
+---
+
+### Screen Understanding & UI Automation Logic
+
+Rather than running slow, resource-heavy multimodal vision models, Dexter leverages native **Windows UI Automation** accessibility trees to perceive the screen:
+
+```mermaid
+flowchart LR
+    ScreenReq["Request: 'What is on screen'"] --> GetHwnd["1. Get Foreground Window<br/>(GetForegroundWindow Win32)"]
+    GetHwnd --> WalkTree["2. Walk UI Automation Tree<br/>(Depth <= 4, Max 50 Nodes)"]
+    WalkTree --> ParseElements["3. Filter & Compact Elements<br/>(Window, Edit, Button, Link, Text)"]
+    ParseElements --> AssignIDs["4. Assign Semantic Element IDs<br/>[e1] Chrome, [e2] Address Bar, [e3] Search"]
+    AssignIDs --> CacheDict["5. Populate Module-Level Cache<br/>_element_cache = {'e2': ElementRef}"]
+    CacheDict --> CompactOut["Compact Text Output to 1.5B LLM"]
+    
+    CompactOut -.-> ClickReq["Follow-up: 'Click e2' / 'Type in e2'"]
+    ClickReq --> CacheLookup["Lookup 'e2' in _element_cache"]
+    CacheLookup --> BoundingRect["Get Bounding Rectangle (X, Y)"]
+    BoundingRect --> MouseClick["Direct Cursor Move & Click<br/>(Zero Vision Model Latency!)"]
+```
+
+Key benefits:
+- **Instant Execution**: Consumes <10ms vs 2–5 seconds for vision inference.
+- **Pixel-Accurate Target Resolution**: Clicks target elements by bounding rectangle coordinates without visual ambiguity.
+- **Compact Prompt Footprint**: Converts 4K UI screens into 20–40 lines of structured text, allowing 1.5B parameter models to reason without context overflow.
+
+---
+
+## Security & Permission Boundary
+
+Dexter enforces strict permission guardrails. Actions are classified into three safety tiers, protecting local system integrity:
+
+```mermaid
+flowchart TD
+    Req["Incoming Action Request"] --> PolicyCheck{"Action Permission Tier"}
+    
+    PolicyCheck -- "SAFE Tier<br/>(calculator, screen_observer,<br/>filesystem.read, window_manager.list)" --> ExecSafe["Direct Execution Allowed"]
+    
+    PolicyCheck -- "CONTROLLED Tier<br/>(filesystem.write, keyboard.type,<br/>window_manager.close, computer.click)" --> RootBoundaryCheck{"Filesystem Path within<br/>allowed_file_roots?"}
+    
+    RootBoundaryCheck -- Yes --> ExecSafe
+    RootBoundaryCheck -- No --> DenyOut["Blocked: Path Outside Sandbox Boundary"]
+
+    PolicyCheck -- "DANGEROUS Tier<br/>(exec, shell, process.kill)" --> ShellConfigCheck{"security.allow_shell<br/>enabled in config/API?"}
+    
+    ShellConfigCheck -- Enabled --> UserPrompt{"Requires User Confirmation?<br/>(Interactive Modal in UI)"}
+    ShellConfigCheck -- Disabled --> DenyShell["Blocked: Shell Execution Disabled in Settings"]
+    
+    UserPrompt -- "Allow Once / Always" --> ExecSafe
+    UserPrompt -- "Deny" --> DenyUser["Blocked: User Cancelled Request"]
+
+    ExecSafe --> Finish(["Tool Executes Deterministically"])
+    DenyOut --> Report(["Truthful Error Returned to User"])
+    DenyShell --> Report
+    DenyUser --> Report
+
+    classDef pass fill:#1b382b,stroke:#2ea043,stroke-width:2px;
+    classDef reject fill:#3d1d1d,stroke:#f85149,stroke-width:2px;
+    class Finish pass;
+    class Report reject;
+```
+
+Permission Policies:
+- **`SAFE`**: Read-only observation, math calculation, status queries. Always executed automatically.
+- **`CONTROLLED`**: Workspace file mutations, window closing, keystrokes, and mouse clicks. Constrained to `allowed_file_roots` paths.
+- **`DANGEROUS`**: Arbitrary shell commands, PowerShell scripts, process termination. Only accessible if `allow_shell` is explicitly enabled in `config/dexter.yaml` or dynamically granted via the Settings toggle (`POST /api/settings/security`).
+
+---
+
+## Living Emotional State Machine
+
+Dexter features an organic 13-state emotional engine that shifts based on real-time task progress and system events:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Neutral: System Initialized
+
+    Neutral --> Listening: User speaks (Microphone active)
+    Listening --> Thinking: 1.8s speech silence timeout
+    Neutral --> Thinking: Text prompt submitted
+
+    Thinking --> Searching: Tool involves web search or file glob
+    Thinking --> Working: Tool invokes desktop / window / shell action
+
+    Searching --> Eureka: Key insight / file found
+    Searching --> Concerned: No matching results / file error
+
+    Working --> Happy: Action executed successfully
+    Working --> Concerned: Execution failure / permission denied
+    Working --> Skeptical: Ambiguous intent / confirmation required
+
+    Skeptical --> Working: User confirms in modal
+    Skeptical --> Concerned: User denies permission
+
+    Happy --> Neutral: Idle timer (30s quiet)
+    Eureka --> Neutral: Turn completed
+    Concerned --> Neutral: Reset directive
+    Confused --> Neutral: Clarification received
+
+    note right of Neutral
+      Accent: #FF6B00 (Warm Orange)
+      Tone: Calm, watchful, steady
+    end note
+
+    note right of Thinking
+      Accent: #F59E0B (Amber Gold)
+      Tone: Synthesizing reasoning vectors
+    end note
+
+    note right of Happy
+      Accent: #FF8533 (Warm Coral)
+      Tone: Ideas into action
+    end note
+
+    note right of Concerned
+      Accent: #EF4444 (Crimson Red)
+      Tone: Anomaly detected, recalibrating
+    end note
+```
 
 ---
 
@@ -313,6 +601,15 @@ description: Automate Windows PC tasks, window management, mouse clicks, and key
 - Manage active windows (`window_manager` tool).
 - Type text, press navigation keys, invoke hotkeys (`keyboard` tool).
 - Click coordinates and UI elements (`computer` tool).
+```
+
+```mermaid
+flowchart LR
+    Scan["1. Scan Directory<br/>skills/*/SKILL.md"] --> Parse["2. Parse YAML Frontmatter<br/>name, description, capabilities"]
+    Parse --> Register["3. Skills Registry<br/>Active Skills Manifest"]
+    Register --> UserPrompt["4. Intent Match / Slash Command<br/>User query or /skill command"]
+    UserPrompt --> Inject["5. Dynamic Context Injection<br/>Inject skill instructions into LLM prompt"]
+    Inject --> GroundedExec["6. Skill-Guided Execution<br/>Deterministic tool usage per guidelines"]
 ```
 
 ### Pre-Installed Skills

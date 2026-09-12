@@ -91,6 +91,10 @@ class STTRequest(BaseModel):
     text: Optional[str] = None
 
 
+class SecuritySettingsRequest(BaseModel):
+    allow_shell: bool
+
+
 workshop_state = {
     "focused": False,
     "last_seen": 0.0,
@@ -381,6 +385,26 @@ async def respond_permission(req: PermissionResponseRequest):
     if not res:
         return {"status": "not_found", "request_id": req.request_id}
     return {"status": "resolved", "request": res.to_dict()}
+
+
+@app.get("/api/settings/security")
+async def get_security_settings():
+    return {
+        "allow_shell": bool(getattr(agent.config.security, "allow_shell", False)),
+        "allowed_file_roots": getattr(agent.config.security, "allowed_file_roots", ["."]),
+    }
+
+
+@app.post("/api/settings/security")
+async def update_security_settings(req: SecuritySettingsRequest):
+    if hasattr(agent.config, "security"):
+        agent.config.security.allow_shell = req.allow_shell
+    if hasattr(agent.registry, "security") and agent.registry.security:
+        agent.registry.security.allow_shell = req.allow_shell
+    return {
+        "status": "ok",
+        "allow_shell": agent.config.security.allow_shell,
+    }
 
 
 # --- Models Endpoints ---
