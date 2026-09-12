@@ -104,24 +104,85 @@ class KeyboardTool(BaseTool):
         action = kwargs.get("action")
         if action == "type_text":
             text = kwargs.get("text", "")
+            focused_ctrl = None
+            try:
+                import uiautomation as auto
+                focused_ctrl = auto.GetFocusedControl()
+            except Exception:
+                pass
+
             for char in text:
                 scan = ord(char)
                 down = _create_keyboard_input(0, scan, KEYEVENTF_UNICODE)
                 up = _create_keyboard_input(0, scan, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)
                 _send_input(down, up)
                 time.sleep(0.01)
-            return {"status": "success", "action": "type_text", "typed": text}
-            
+
+            time.sleep(0.05)
+            verified = False
+            current_val = None
+            if focused_ctrl:
+                try:
+                    val_pattern = focused_ctrl.GetValuePattern()
+                    if val_pattern:
+                        current_val = val_pattern.Value
+                        if text in (current_val or ""):
+                            verified = True
+                except Exception:
+                    pass
+
+            if verified:
+                return {
+                    "action": "type_text",
+                    "typed": text,
+                    "status": "verified",
+                    "verification": {
+                        "status": "verified",
+                        "verified": True,
+                        "reason": f"Input confirmed in focused field: '{current_val}'",
+                    },
+                }
+            else:
+                return {
+                    "action": "type_text",
+                    "typed": text,
+                    "status": "executed_unverified",
+                    "verification": {
+                        "status": "executed_unverified",
+                        "verified": False,
+                        "reason": "Text typed via SendInput, but control does not expose ValuePattern or active verification.",
+                    },
+                }
+
         elif action == "press_key":
             key = kwargs.get("key", "").lower().strip()
             vk = VK_MAP.get(key)
             if vk is None:
-                return {"status": "error", "message": f"Unknown key: {key}"}
+                return {
+                    "action": "press_key",
+                    "key": key,
+                    "status": "error",
+                    "message": f"Unknown key: {key}",
+                    "verification": {
+                        "status": "failed",
+                        "verified": False,
+                        "reason": f"Unknown virtual key code for '{key}'",
+                    },
+                }
             down = _create_keyboard_input(vk, 0, 0)
             up = _create_keyboard_input(vk, 0, KEYEVENTF_KEYUP)
             _send_input(down, up)
-            return {"status": "success", "action": "press_key", "key": key}
-            
+            return {
+                "action": "press_key",
+                "key": key,
+                "status": "executed_unverified",
+                "verification": {
+                    "status": "executed_unverified",
+                    "verified": False,
+                    "reason": f"Key [{key}] sent via SendInput.",
+                },
+            }
+
         elif action == "hotkey":
             keys_str = kwargs.get("keys", "").lower().strip()
             parts = [p.strip() for p in keys_str.split('+')]
@@ -129,31 +190,62 @@ class KeyboardTool(BaseTool):
             for p in parts:
                 vk = VK_MAP.get(p)
                 if vk is None:
-                    return {"status": "error", "message": f"Unknown key in hotkey: {p}"}
+                    return {
+                        "action": "hotkey",
+                        "keys": keys_str,
+                        "status": "error",
+                        "message": f"Unknown key in hotkey: {p}",
+                        "verification": {
+                            "status": "failed",
+                            "verified": False,
+                            "reason": f"Unknown key '{p}' in hotkey sequence",
+                        },
+                    }
                 vks.append(vk)
-                
+
             inputs = []
             for vk in vks:
                 inputs.append(_create_keyboard_input(vk, 0, 0))
             for vk in reversed(vks):
                 inputs.append(_create_keyboard_input(vk, 0, KEYEVENTF_KEYUP))
-                
+
             _send_input(*inputs)
-            return {"status": "success", "action": "hotkey", "keys": keys_str}
-            
-        return {"status": "error", "message": "Invalid action"}
+            return {
+                "action": "hotkey",
+                "keys": keys_str,
+                "status": "executed_unverified",
+                "verification": {
+                    "status": "executed_unverified",
+                    "verified": False,
+                    "reason": f"Hotkey [{keys_str}] sent via SendInput.",
+                },
+            }
+
+        return {
+            "action": action or "unknown",
+            "status": "failed",
+            "message": "Invalid action",
+            "verification": {
+                "status": "failed",
+                "verified": False,
+                "reason": f"Invalid keyboard action '{action}'",
+            },
+        }
 
     def format_display(self, result: Any) -> str:
         out = result.output if hasattr(result, "output") else result
         if isinstance(out, dict):
-            status = out.get('status')
-            if status == 'error':
-                return f"Keyboard Error: {out.get('message')}"
-            action = out.get('action')
-            if action == 'type_text':
-                return f"Typed: \"{out.get('typed')}\""
-            elif action == 'press_key':
+            status = out.get("status")
+            if status in ["failed", "error"]:
+                return f"Keyboard Error: {out.get('message', 'execution failed')}"
+            action = out.get("action")
+            if action == "type_text":
+                typed_val = out.get("typed", "")
+                if status == "verified":
+                    return f"Typed: \"{typed_val}\" (verified in target control)."
+                return f"Typed: \"{typed_val}\" (executed, unverified screen state)."
+            elif action == "press_key":
                 return f"Pressed key [{out.get('key')}]."
-            elif action == 'hotkey':
+            elif action == "hotkey":
                 return f"Executed hotkey [{out.get('keys')}]."
         return str(out)

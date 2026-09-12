@@ -1,6 +1,7 @@
 """Core Victor Agent — Orchestrator for tools, memory, and conversation."""
 
 import json
+import os
 import re
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
@@ -17,6 +18,13 @@ from dexter.tools.base import ToolResult
 from dexter.tools.factory import create_tool_registry
 from dexter.tools.registry import ToolRegistry
 from dexter.tools.router import ToolRouter
+
+
+def _debug_log(stage: str, message: str):
+    """Log structured debug telemetry if debugging is enabled."""
+    if os.environ.get("DEXTER_DEBUG") or os.environ.get("VICTOR_DEBUG"):
+        print(f"[DEBUG] {stage.upper()}: {message}")
+
 
 
 def strip_emojis(text: str) -> str:
@@ -425,6 +433,7 @@ class DexterAgent:
         # Case A: Tool was autonomously matched
         if auto_tool:
             tool_name, parameters = auto_tool
+            _debug_log("ROUTER", f"Autonomous match -> {tool_name} with params: {parameters}")
             step = task.add_step(name=tool_name, tool=tool_name)
             step.status = "running"
 
@@ -436,6 +445,7 @@ class DexterAgent:
                 await self.set_emotion("thinking", reason=f"Executing {tool_name}")
             await self.event_bus.emit("agent.state", state="working")
             await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
+            _debug_log("EXECUTION", f"Executing {tool_name} with {parameters}...")
             result: ToolResult = await self.registry.execute_tool(tool_name, **parameters)
 
             step.duration = result.duration
@@ -445,17 +455,62 @@ class DexterAgent:
                 "result": result.model_dump(),
             }
 
+            status = getattr(result, "status", "verified")
+            _debug_log("VERIFICATION", f"Tool {tool_name} status='{status}', verification={getattr(result, 'verification', {})}")
+
             # Get the tool's own formatted display
             tool_obj = self.registry.get(tool_name)
             obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
-            if not result.success:
+            if not result.success or status in ["failed", "timeout"]:
                 step.status = "failed"
-                step.output = str(result.error)
-                await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
-                await self.set_emotion("concerned", reason=f"Tool {tool_name} encountered an error")
-                # REPORT TRUTH DIRECTLY: never feed errors to LLM to hallucinate success
-                final_content = obs_formatted if obs_formatted else f"Action failed: {result.error}"
+                step.output = str(result.error or status)
+                await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error or status, output=result.output)
+                await self.set_emotion("concerned", reason=f"Tool {tool_name} failed verification")
+                # REPORT TRUTH DIRECTLY: never feed errors or failed verification to LLM to hallucinate success
+                final_content = obs_formatted if obs_formatted else f"Action failed verification: {result.error or 'target desktop state not reached'}"
+                self.tasks.complete_task(task.id, outcome=final_content[:150])
+            elif status == "executed_unverified":
+                step.status = "executed_unverified"
+                step.output = str(result.output)[:200]
+                await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                await self.set_emotion("skeptical", reason=f"Tool {tool_name} executed without verification")
+
+                wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
+                is_direct_action = (
+                    tool_name in ["applications", "keyboard", "window_manager", "computer", "exec", "shell", "process"] or
+                    (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file", "edit", "append"]) or
+                    (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
+                )
+
+                if is_direct_action and not wants_detail:
+                    final_content = obs_formatted
+                else:
+                    length_rule = "Give a detailed answer as requested." if wants_detail else "Keep your answer small and concise: 1 to 2 sentences max."
+                    observation_msg = (
+                        f"Tool result ({tool_name}) [Status: EXECUTED_UNVERIFIED]:\n"
+                        f"{obs_formatted}\n\n"
+                        f"The user asked: {user_message}\n"
+                        f"STRICT TRUTH RULE: The action was executed mechanically, but desktop screen state COULD NOT be verified. Never claim it succeeded or is visible. Explicitly state that the action was sent but could not be verified on the desktop screen. {length_rule} No emojis."
+                    )
+                    synthetic_history = list(self.history)
+                    synthetic_history.append(ChatMessage(role="user", content=observation_msg))
+
+                    await self.event_bus.emit("agent.state", state="thinking")
+                    try:
+                        final_resp = await self.llm.generate(
+                            messages=synthetic_history,
+                            system_prompt=system_prompt,
+                            temperature=self.config.model.temperature,
+                            max_tokens=self.config.model.max_tokens if wants_detail else 120,
+                        )
+                        if final_resp.content and not final_resp.content.startswith("[Ollama"):
+                            final_content = strip_emojis(final_resp.content.strip())
+                        else:
+                            final_content = obs_formatted
+                    except Exception:
+                        final_content = obs_formatted
+
                 self.tasks.complete_task(task.id, outcome=final_content[:150])
             else:
                 step.status = "completed"
@@ -464,7 +519,7 @@ class DexterAgent:
                 if tool_name in ["web_search", "youtube", "browser", "web_fetch"]:
                     await self.set_emotion("eureka" if any(w in user_message.lower() for w in ["find", "search", "solve", "how", "what", "where"]) else "excited", reason="Discovered live web information")
                 else:
-                    await self.set_emotion("happy", reason="Action succeeded")
+                    await self.set_emotion("happy", reason="Action verified on desktop")
 
                 # Check if user explicitly asked for detail
                 wants_detail = any(w in user_message.lower() for w in ["detail", "elaborate", "explain", "comprehensive", "full", "why", "deep", "breakdown", "list all"])
@@ -479,7 +534,7 @@ class DexterAgent:
                 else:
                     length_rule = "Give a detailed answer as requested." if wants_detail else "Keep your answer small and concise: 1 to 2 sentences max. Do NOT give unsolicited essays."
                     observation_msg = (
-                        f"Tool result ({tool_name}):\n"
+                        f"Tool result ({tool_name}) [Status: VERIFIED]:\n"
                         f"{obs_formatted}\n\n"
                         f"The user asked: {user_message}\n"
                         f"{length_rule} No emojis. No raw JSON. State facts accurately."
@@ -529,10 +584,15 @@ class DexterAgent:
                     except Exception:
                         parameters = {}
 
+                _debug_log("ROUTER", f"LLM matched tool -> {tool_name} with params: {parameters}")
                 await self.set_emotion("thinking", reason=f"Invoking {tool_name}")
                 await self.event_bus.emit("agent.state", state="working")
                 await self.event_bus.emit("tool.started", tool=tool_name, parameters=parameters)
+                _debug_log("EXECUTION", f"Executing {tool_name}...")
                 result = await self.registry.execute_tool(tool_name, **parameters)
+
+                status = getattr(result, "status", "verified")
+                _debug_log("VERIFICATION", f"Tool {tool_name} status='{status}', verification={getattr(result, 'verification', {})}")
 
                 tool_executed_info = {
                     "name": tool_name,
@@ -542,13 +602,50 @@ class DexterAgent:
                 tool_obj = self.registry.get(tool_name)
                 obs_formatted = tool_obj.format_display(result) if tool_obj else result.to_summary_string(max_length=1500)
 
-                if not result.success:
-                    await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error, output=result.output)
-                    await self.set_emotion("concerned", reason=f"{tool_name} failed")
-                    final_content = obs_formatted if obs_formatted else f"Action failed: {result.error}"
+                if not result.success or status in ["failed", "timeout"]:
+                    await self.event_bus.emit("tool.failed", tool=tool_name, error=result.error or status, output=result.output)
+                    await self.set_emotion("concerned", reason=f"{tool_name} failed verification")
+                    final_content = obs_formatted if obs_formatted else f"Action failed verification: {result.error or 'desktop verification failed'}"
+                elif status == "executed_unverified":
+                    await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
+                    await self.set_emotion("skeptical", reason=f"{tool_name} executed without verification")
+                    is_direct_action = (
+                        tool_name in ["applications", "keyboard", "window_manager", "computer", "exec", "shell", "process"] or
+                        (tool_name == "filesystem" and parameters.get("action") in ["create_file", "create_folder", "open", "rename_file", "move_file", "copy_file", "edit", "append"]) or
+                        (tool_name == "screen_observer" and parameters.get("action") in ["take_screenshot"])
+                    )
+
+                    if is_direct_action and not wants_detail:
+                        final_content = obs_formatted
+                    else:
+                        length_rule = "Provide a detailed answer as requested." if wants_detail else "Keep your response small and concise: 1 to 2 sentences max."
+                        observation_msg = (
+                            f"Tool result ({tool_name}) [Status: EXECUTED_UNVERIFIED]:\n"
+                            f"{obs_formatted}\n\n"
+                            f"STRICT TRUTH RULE: The action was executed mechanically, but desktop screen state COULD NOT be verified. Never claim it succeeded or is visible. Explicitly state that the action was sent but could not be verified on the desktop screen. {length_rule} No emojis."
+                        )
+
+                        synthetic_history = list(self.history)
+                        synthetic_history.append(ChatMessage(role="assistant", content=initial_content))
+                        synthetic_history.append(ChatMessage(role="user", content=observation_msg))
+
+                        await self.event_bus.emit("agent.state", state="thinking")
+                        try:
+                            final_resp = await self.llm.generate(
+                                messages=synthetic_history,
+                                system_prompt=system_prompt,
+                                temperature=self.config.model.temperature,
+                                max_tokens=self.config.model.max_tokens if wants_detail else 120,
+                            )
+                            if final_resp.content and not final_resp.content.startswith("[Ollama"):
+                                final_content = strip_emojis(final_resp.content.strip())
+                            else:
+                                final_content = obs_formatted
+                        except Exception:
+                            final_content = obs_formatted
                 else:
                     await self.event_bus.emit("tool.completed", tool=tool_name, duration=result.duration, output=result.output)
-                    await self.set_emotion("happy", reason=f"{tool_name} completed successfully")
+                    await self.set_emotion("happy", reason=f"{tool_name} verified successfully")
 
                     is_direct_action = (
                         tool_name in ["applications", "keyboard", "window_manager", "computer", "exec", "shell", "process"] or
@@ -561,7 +658,7 @@ class DexterAgent:
                     else:
                         length_rule = "Provide a detailed answer as requested." if wants_detail else "Keep your response small and concise: 1 to 2 sentences max."
                         observation_msg = (
-                            f"Tool result ({tool_name}):\n"
+                            f"Tool result ({tool_name}) [Status: VERIFIED]:\n"
                             f"{obs_formatted}\n\n"
                             f"{length_rule} No emojis. No raw JSON. State facts accurately."
                         )
@@ -611,6 +708,7 @@ class DexterAgent:
 
         self.history.append(ChatMessage(role="assistant", content=final_content))
         duration = round(time.perf_counter() - start_time, 3)
+        _debug_log("RESULT", f"Outcome (duration={duration}s, emotion={self.emotion}): {final_content[:150]}")
         await self.event_bus.emit("agent.state", state="idle")
         await self.event_bus.emit("agent.completed", duration=duration, emotion=self.emotion, content=final_content, user_message=user_message)
 

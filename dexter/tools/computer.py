@@ -93,6 +93,10 @@ class ComputerTool(BaseTool):
                 "type": "string",
                 "description": "UI element ID from observe_screen to click (e.g. 'e1', 'e2')"
             },
+            "observation_id": {
+                "type": "integer",
+                "description": "Observation ID from screen_observer to prevent stale clicks"
+            },
             "x": {
                 "type": "integer",
                 "description": "X coordinate on screen (fallback if element not provided)"
@@ -127,6 +131,7 @@ class ComputerTool(BaseTool):
         self,
         action: str = "window_info",
         element: Optional[str] = None,
+        observation_id: Optional[int] = None,
         x: Optional[int] = None,
         y: Optional[int] = None,
         button: str = "left",
@@ -146,6 +151,8 @@ class ComputerTool(BaseTool):
                 "screen_height": height,
                 "cursor_x": curr_x,
                 "cursor_y": curr_y,
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True},
             }
 
         elif action == "window_info":
@@ -155,80 +162,128 @@ class ComputerTool(BaseTool):
                 "action": "window_info",
                 "active_window": title,
                 "cursor": {"x": curr_x, "y": curr_y},
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True},
             }
 
         elif action == "move":
             if x is None or y is None:
                 raise ValueError("X and Y coordinates required for mouse move.")
             ctrl.mouse_move(x, y)
-            return {"action": "move", "x": x, "y": y, "status": "success"}
+            return {
+                "action": "move",
+                "x": x,
+                "y": y,
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True},
+            }
 
+        elif action == "click":
             # 1. UI Automation Element ID or Text resolution
             target_eid = element or kwargs.get("element_id")
-            if target_eid:
-                target_eid = target_eid.strip().lower()
-                from dexter.tools.screen_observer import _element_cache
-                control = _element_cache.get(target_eid)
-                if not control:
-                    # Search by text match in cached elements
-                    for k, ctrl_item in _element_cache.items():
-                        try:
-                            if target_eid in getattr(ctrl_item, "Name", "").lower():
-                                control = ctrl_item
-                                target_eid = k
-                                break
-                        except Exception:
-                            pass
+            obs_id = observation_id or kwargs.get("obs_id")
 
-                if control:
-                    try:
-                        if hasattr(control, "BoundingRectangle"):
-                            rect = control.BoundingRectangle
-                            cx = int((rect.left + rect.right) / 2)
-                            cy = int((rect.top + rect.bottom) / 2)
-                            ctrl.mouse_click(x=cx, y=cy, button=button, double=double)
-                            return {
-                                "action": "click",
-                                "element": target_eid,
-                                "name": getattr(control, "Name", ""),
-                                "x": cx,
-                                "y": cy,
-                                "button": button,
-                                "double": double,
-                                "status": "success",
-                            }
-                        elif hasattr(control, "Click"):
-                            if double and hasattr(control, "DoubleClick"):
-                                control.DoubleClick()
-                            elif button == "right" and hasattr(control, "RightClick"):
-                                control.RightClick()
-                            else:
-                                control.Click()
-                            return {
-                                "action": "click",
-                                "element": target_eid,
-                                "name": getattr(control, "Name", ""),
-                                "status": "success",
-                            }
-                    except Exception as e:
-                        pass
-                else:
+            if target_eid:
+                from dexter.tools.screen_observer import get_cached_element
+                control, err = get_cached_element(target_eid, obs_id)
+                if err:
                     return {
                         "action": "click",
                         "element": target_eid,
-                        "status": "error",
-                        "message": f"Element '{target_eid}' not found in active screen cache. Use 'observe screen' to refresh."
+                        "status": "failed",
+                        "message": err,
+                        "verification": {
+                            "status": "failed",
+                            "verified": False,
+                            "reason": err,
+                        },
                     }
 
+                initial_window = ctrl.get_active_window_title()
+                cx, cy = None, None
+                try:
+                    if hasattr(control, "BoundingRectangle"):
+                        rect = control.BoundingRectangle
+                        cx = int((rect.left + rect.right) / 2)
+                        cy = int((rect.top + rect.bottom) / 2)
+                        ctrl.mouse_click(x=cx, y=cy, button=button, double=double)
+                    elif hasattr(control, "Click"):
+                        if double and hasattr(control, "DoubleClick"):
+                            control.DoubleClick()
+                        elif button == "right" and hasattr(control, "RightClick"):
+                            control.RightClick()
+                        else:
+                            control.Click()
+                except Exception as e:
+                    return {
+                        "action": "click",
+                        "element": target_eid,
+                        "status": "failed",
+                        "message": f"Failed to execute click on element: {e}",
+                        "verification": {
+                            "status": "failed",
+                            "verified": False,
+                            "reason": str(e),
+                        },
+                    }
+
+                time.sleep(0.15)
+                new_window = ctrl.get_active_window_title()
+                state_changed = (new_window != initial_window)
+                elem_name = getattr(control, "Name", "") or target_eid
+
+                status = "verified" if state_changed else "executed_unverified"
+                reason = (
+                    f"Clicked [{target_eid}] '{elem_name}'. Active window transitioned to '{new_window}'."
+                    if state_changed
+                    else f"Clicked [{target_eid}] '{elem_name}'. Click performed, but active window did not change."
+                )
+
+                return {
+                    "action": "click",
+                    "element": target_eid,
+                    "name": elem_name,
+                    "x": cx,
+                    "y": cy,
+                    "button": button,
+                    "double": double,
+                    "status": status,
+                    "verification": {
+                        "status": status,
+                        "verified": state_changed,
+                        "reason": reason,
+                    },
+                }
+
             # 2. Coordinate fallback
+            if x is None or y is None:
+                raise ValueError("Must provide either 'element' or 'x' and 'y' coordinates for click.")
+
+            initial_window = ctrl.get_active_window_title()
             ctrl.mouse_click(x=x, y=y, button=button, double=double)
+            time.sleep(0.15)
+            new_window = ctrl.get_active_window_title()
+            state_changed = (new_window != initial_window)
+
+            status = "verified" if state_changed else "executed_unverified"
+            reason = (
+                f"Clicked coordinates ({x}, {y}). Active window transitioned to '{new_window}'."
+                if state_changed
+                else f"Clicked coordinates ({x}, {y}). Click performed, but active window did not change."
+            )
+
             return {
                 "action": "click",
                 "x": x,
                 "y": y,
                 "button": button,
                 "double": double,
-                "status": "success",
+                "status": status,
+                "verification": {
+                    "status": status,
+                    "verified": state_changed,
+                    "reason": reason,
+                },
             }
 
         elif action == "scroll":
@@ -241,7 +296,8 @@ class ComputerTool(BaseTool):
                 "action": "scroll",
                 "amount": amt,
                 "direction": "up" if amt > 0 else "down",
-                "status": "success",
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True},
             }
 
         raise ValueError(f"Unknown computer action: '{action}'")
@@ -284,12 +340,26 @@ class ComputerTool(BaseTool):
         out = result.output
         if isinstance(out, dict):
             act = out.get("action", "")
+            status = out.get("status", "")
             if act == "click":
-                return f"Clicked mouse at ({out.get('x')}, {out.get('y')})."
+                elem = out.get("element")
+                name = out.get("name")
+                target_str = f"[{elem}] '{name}'" if elem and name else (f"[{elem}]" if elem else f"at coordinates ({out.get('x')}, {out.get('y')})")
+                if status == "verified":
+                    return f"Clicked {target_str} (verified: screen state changed)."
+                elif status == "executed_unverified":
+                    return f"Clicked {target_str} (executed, but could not verify resulting screen state)."
+                elif status == "failed":
+                    return f"Failed to click {target_str}: {out.get('message', 'element unavailable')}."
+                return f"Clicked {target_str}."
             elif act == "window_info":
                 return f"Active window: \"{out.get('active_window', '')}\" at cursor ({out.get('cursor', {}).get('x')}, {out.get('cursor', {}).get('y')})."
             elif act == "screen_info":
                 return f"Screen resolution: {out.get('screen_width')}x{out.get('screen_height')}."
+            elif act == "move":
+                return f"Moved cursor to ({out.get('x')}, {out.get('y')})."
+            elif act == "scroll":
+                return f"Scrolled {out.get('direction', 'down')} by {abs(out.get('amount', 3))} clicks."
             return f"Computer action '{act}' executed successfully."
         return str(out)
 

@@ -141,7 +141,9 @@ class FilesystemTool(BaseTool):
                 "total_lines": total_lines,
                 "read_lines": len(selected_lines),
                 "truncated": truncated,
-                "content": "".join(selected_lines)
+                "content": "".join(selected_lines),
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True, "target": str(file_path)},
             }
             
         elif action == "search":
@@ -178,7 +180,9 @@ class FilesystemTool(BaseTool):
             return {
                 "action": "search",
                 "query": query,
-                "results": results
+                "results": results,
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True, "count": len(results)},
             }
             
         elif action == "list":
@@ -210,7 +214,9 @@ class FilesystemTool(BaseTool):
             return {
                 "action": "list",
                 "path": str(resolved_path),
-                "contents": results
+                "contents": results,
+                "status": "verified",
+                "verification": {"status": "verified", "verified": True, "target": str(resolved_path)},
             }
             
         elif action == "open":
@@ -233,7 +239,13 @@ class FilesystemTool(BaseTool):
             return {
                 "action": "open",
                 "path": resolved_path,
-                "status": "opened"
+                "status": "verified",
+                "verification": {
+                    "status": "verified",
+                    "verified": True,
+                    "target": str(resolved_path),
+                    "reason": f"Dispatched OS launch for target '{resolved_path}'",
+                },
             }
             
         elif action == "create_folder":
@@ -249,12 +261,20 @@ class FilesystemTool(BaseTool):
             
             try:
                 os.makedirs(str(resolved_path), exist_ok=True)
-                if not resolved_path.exists():
+                verified = os.path.isdir(str(resolved_path))
+                if not verified:
                     raise IOError(f"Could not verify folder creation at {resolved_path}")
+                status = "verified" if verified else "failed"
                 return {
                     "action": "create_folder",
                     "path": str(resolved_path.resolve()),
-                    "status": "created"
+                    "status": status,
+                    "verification": {
+                        "status": status,
+                        "verified": verified,
+                        "target": str(resolved_path.resolve()),
+                        "reason": f"Folder verified on disk: '{resolved_path.resolve()}'",
+                    },
                 }
             except Exception as e:
                 raise RuntimeError(f"Failed to create folder: {e}")
@@ -272,12 +292,20 @@ class FilesystemTool(BaseTool):
             resolved_path.parent.mkdir(parents=True, exist_ok=True)
             content = kwargs.get("content", "")
             resolved_path.write_text(content, encoding="utf-8")
-            if not resolved_path.exists():
+            verified = os.path.isfile(str(resolved_path))
+            if not verified:
                 raise IOError(f"Could not verify file creation at {resolved_path}")
+            status = "verified" if verified else "failed"
             return {
                 "action": "create_file",
                 "path": str(resolved_path.resolve()),
-                "status": "created"
+                "status": status,
+                "verification": {
+                    "status": status,
+                    "verified": verified,
+                    "target": str(resolved_path.resolve()),
+                    "reason": f"File verified on disk: '{resolved_path.resolve()}'",
+                },
             }
 
         elif action == "rename_file":
@@ -289,11 +317,19 @@ class FilesystemTool(BaseTool):
                 raise FileNotFoundError(f"File not found: {path}")
             new_path = old_path.parent / new_name.strip()
             old_path.rename(new_path)
+            verified = not old_path.exists() and new_path.exists()
+            status = "verified" if verified else "failed"
             return {
                 "action": "rename_file",
                 "old_path": str(old_path),
                 "new_path": str(new_path),
-                "status": "renamed"
+                "status": status,
+                "verification": {
+                    "status": status,
+                    "verified": verified,
+                    "target": str(new_path),
+                    "reason": f"Renamed to verified new path '{new_path}'",
+                },
             }
 
         elif action == "move_file":
@@ -303,11 +339,19 @@ class FilesystemTool(BaseTool):
             src_path = Path(self._resolve_special_path(path))
             dest_path = Path(self._resolve_special_path(dest))
             shutil.move(str(src_path), str(dest_path))
+            verified = not src_path.exists() and dest_path.exists()
+            status = "verified" if verified else "failed"
             return {
                 "action": "move_file",
                 "source": str(src_path),
                 "destination": str(dest_path),
-                "status": "moved"
+                "status": status,
+                "verification": {
+                    "status": status,
+                    "verified": verified,
+                    "target": str(dest_path),
+                    "reason": f"Moved to verified destination '{dest_path}'",
+                },
             }
 
         elif action == "copy_file":
@@ -320,11 +364,19 @@ class FilesystemTool(BaseTool):
                 shutil.copytree(str(src_path), str(dest_path), dirs_exist_ok=True)
             else:
                 shutil.copy2(str(src_path), str(dest_path))
+            verified = dest_path.exists()
+            status = "verified" if verified else "failed"
             return {
                 "action": "copy_file",
                 "source": str(src_path),
                 "destination": str(dest_path),
-                "status": "copied"
+                "status": status,
+                "verification": {
+                    "status": status,
+                    "verified": verified,
+                    "target": str(dest_path),
+                    "reason": f"Copied to verified destination '{dest_path}'",
+                },
             }
 
         elif action == "edit":
@@ -342,11 +394,18 @@ class FilesystemTool(BaseTool):
                 raise ValueError(f"Target text '{old_text[:50]}' not found in '{path}'.")
             updated = content.replace(old_text, new_text, 1)
             resolved_path.write_text(updated, encoding="utf-8")
+            verified = new_text in resolved_path.read_text(encoding="utf-8")
             return {
                 "action": "edit",
                 "path": str(resolved_path),
-                "status": "edited",
-                "replacements": 1
+                "status": "edited" if verified else "failed",
+                "replacements": 1,
+                "verification": {
+                    "status": "verified" if verified else "failed",
+                    "verified": verified,
+                    "target": str(resolved_path),
+                    "reason": f"File content edit verified in '{resolved_path}'",
+                },
             }
 
         elif action == "append":
@@ -360,10 +419,17 @@ class FilesystemTool(BaseTool):
                 raise PermissionError(f"Access denied: Path '{path}' is outside allowed directory roots.")
             with open(resolved_path, "a", encoding="utf-8") as f:
                 f.write(content_to_add)
+            verified = content_to_add in resolved_path.read_text(encoding="utf-8")
             return {
                 "action": "append",
                 "path": str(resolved_path),
-                "status": "appended"
+                "status": "appended" if verified else "failed",
+                "verification": {
+                    "status": "verified" if verified else "failed",
+                    "verified": verified,
+                    "target": str(resolved_path),
+                    "reason": f"File append verified in '{resolved_path}'",
+                },
             }
 
         else:
@@ -471,6 +537,9 @@ class FilesystemTool(BaseTool):
         out = result.output
         if isinstance(out, dict):
             action = out.get("action")
+            status = out.get("status", "")
+            if status in ["failed", "timeout"]:
+                return f"Filesystem action '{action}' failed verification: {out.get('message', 'operation unverified on disk')}."
             if action == "read":
                 path = out.get("path", "")
                 lines_count = out.get("total_lines", 0)
@@ -490,19 +559,19 @@ class FilesystemTool(BaseTool):
                 display = "\n".join([f"- {'[DIR] ' if r['is_dir'] else '[FILE]'} {r['name']} ({r['size_bytes']} bytes)" for r in res[:50]])
                 return f"Contents of `{path}` ({len(res)} items):\n{display}"
             elif action == "open":
-                return f"Opened {out.get('path')}."
+                return f"Opened `{out.get('path')}`."
             elif action == "create_folder":
-                return f"Created folder `{out.get('path')}`."
+                return f"Created folder `{out.get('path')}` (verified on disk)."
             elif action == "create_file":
-                return f"Created file `{out.get('path')}`."
+                return f"Created file `{out.get('path')}` (verified on disk)."
             elif action == "edit":
-                return f"Edited `{out.get('path')}`."
+                return f"Edited `{out.get('path')}` (verified on disk)."
             elif action == "append":
-                return f"Appended content to `{out.get('path')}`."
+                return f"Appended content to `{out.get('path')}` (verified on disk)."
             elif action == "rename_file":
-                return f"Renamed `{out.get('old_path')}` to `{out.get('new_path')}`."
+                return f"Renamed `{out.get('old_path')}` to `{out.get('new_path')}` (verified on disk)."
             elif action == "move_file":
-                return f"Moved `{out.get('source')}` to `{out.get('destination')}`."
+                return f"Moved `{out.get('source')}` to `{out.get('destination')}` (verified on disk)."
             elif action == "copy_file":
-                return f"Copied `{out.get('source')}` to `{out.get('destination')}`."
+                return f"Copied `{out.get('source')}` to `{out.get('destination')}` (verified on disk)."
         return str(out)

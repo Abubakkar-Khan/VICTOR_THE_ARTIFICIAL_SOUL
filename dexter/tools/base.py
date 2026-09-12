@@ -20,21 +20,32 @@ class ToolResult(BaseModel):
     output: Any
     error: Optional[str] = None
     duration: float = 0.0
+    status: str = "verified"  # "verified", "executed_unverified", "failed", "timeout"
+    verification: Dict[str, Any] = Field(default_factory=dict)
+    target: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def to_summary_string(self, max_length: int = 4000) -> str:
         """Format the result cleanly for the LLM context."""
-        if not self.success:
-            return f"Error ({self.error}): {self.output}"
-        
+        status_tag = f"Status: {self.status.upper()}"
+        if not self.success or self.status in ["failed", "timeout"]:
+            err_msg = self.error or "Action failed"
+            return f"[{status_tag}] Error ({err_msg}): {self.output}"
+
+        if self.status == "executed_unverified":
+            prefix = f"[{status_tag}] The command was executed, but resulting state could not be verified.\n"
+        else:
+            prefix = f"[{status_tag}]\n"
+
         if isinstance(self.output, (dict, list)):
             text = json.dumps(self.output, indent=2, ensure_ascii=False)
         else:
             text = str(self.output)
-            
-        if len(text) > max_length:
-            return text[:max_length] + f"\n... [Truncated: {len(text) - max_length} characters omitted]"
-        return text
+
+        full = prefix + text
+        if len(full) > max_length:
+            return full[:max_length] + f"\n... [Truncated: {len(full) - max_length} characters omitted]"
+        return full
 
 
 class BaseTool(ABC):
@@ -56,9 +67,38 @@ class BaseTool(ABC):
         try:
             output = await self.run(**kwargs)
             duration = time.perf_counter() - start_time
+
+            status = "verified"
+            verification = {}
+            target = kwargs.get("app_name") or kwargs.get("title") or kwargs.get("path") or kwargs.get("target") or None
+            success = True
+
+            if isinstance(output, dict):
+                if "verification" in output and isinstance(output["verification"], dict):
+                    verification = output["verification"]
+                    status = verification.get("status", "verified")
+                elif "status" in output:
+                    raw_status = str(output["status"]).lower()
+                    if raw_status in ["failed", "timeout"]:
+                        status = raw_status
+                    elif raw_status == "error":
+                        status = "failed"
+                    elif raw_status in ["executed_unverified", "unverified"]:
+                        status = "executed_unverified"
+                    elif raw_status in ["verified", "success", "edited", "appended", "created", "opened", "renamed", "moved", "copied"]:
+                        status = "verified"
+
+                if "success" in output and isinstance(output["success"], bool):
+                    success = output["success"]
+                if "target" in output and isinstance(output["target"], str):
+                    target = output["target"]
+
             return ToolResult(
-                success=True,
+                success=success,
                 output=output,
+                status=status,
+                verification=verification,
+                target=target,
                 duration=round(duration, 3)
             )
         except Exception as e:
@@ -67,6 +107,7 @@ class BaseTool(ABC):
                 success=False,
                 output=str(e),
                 error=type(e).__name__,
+                status="failed",
                 duration=round(duration, 3)
             )
 

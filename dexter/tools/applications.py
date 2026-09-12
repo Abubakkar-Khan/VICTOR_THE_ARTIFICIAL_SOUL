@@ -260,52 +260,70 @@ class ApplicationTool(BaseTool):
                 available.append({"name": name, "installed": bin_path is not None})
             return {
                 "action": "list",
+                "status": "verified",
+                "success": True,
                 "applications": available
             }
-            
+
         elif action == "close":
             target = app_name.strip().lower()
             if not target:
                 raise ValueError("Application name is required for 'close' action.")
-                
+
             if sys.platform == "win32":
-                EnumWindows = ctypes.windll.user32.EnumWindows
-                EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
-                GetWindowText = ctypes.windll.user32.GetWindowTextW
-                GetWindowTextLength = ctypes.windll.user32.GetWindowTextLengthW
-                IsWindowVisible = ctypes.windll.user32.IsWindowVisible
-                SendMessage = ctypes.windll.user32.SendMessageW
-                WM_CLOSE = 0x0010
-                
-                closed_count = 0
-                
-                def foreach_window(hwnd, lParam):
-                    nonlocal closed_count
-                    if IsWindowVisible(hwnd):
-                        length = GetWindowTextLength(hwnd)
-                        if length > 0:
-                            buff = ctypes.create_unicode_buffer(length + 1)
-                            GetWindowText(hwnd, buff, length + 1)
-                            title = buff.value.lower()
-                            canonical = self.CANONICAL_ALIASES.get(target, target)
-                            if target in title or canonical in title:
-                                SendMessage(hwnd, WM_CLOSE, 0, 0)
-                                closed_count += 1
-                    return True
-                    
-                EnumWindows(EnumWindowsProc(foreach_window), 0)
-                
-                if closed_count > 0:
-                    return {"action": "close", "status": "success", "message": f"Sent close signal to {closed_count} windows matching '{app_name}'."}
-                else:
-                    return {"action": "close", "status": "not_found", "message": f"No visible windows found matching '{app_name}'."}
+                from dexter.tools.verifier import (
+                    find_all_windows,
+                    ActionVerifier,
+                    ActionResultStatus
+                )
+
+                canonical = self.CANONICAL_ALIASES.get(target, target)
+
+                # Collect all visible matching windows
+                matched_hwnds = []
+                for w in find_all_windows(only_visible=True):
+                    p_name = w["process_name"].lower()
+                    title = w["title"].lower()
+                    if (target in p_name or canonical in p_name or target in title or canonical in title):
+                        matched_hwnds.append(w["hwnd"])
+
+                if not matched_hwnds:
+                    return {
+                        "action": "close",
+                        "application": app_name,
+                        "status": "failed",
+                        "success": False,
+                        "message": f"No open windows matching '{app_name}' were found on the desktop."
+                    }
+
+                # Send WM_CLOSE to matching windows
+                for hwnd in matched_hwnds:
+                    try:
+                        ctypes.windll.user32.PostMessageW(hwnd, 0x0010, 0, 0)
+                    except Exception:
+                        pass
+
+                # VERIFY that target windows actually closed
+                verify_res = await ActionVerifier.verify_app_close(app_name, matched_hwnds, timeout=3.5)
+                return {
+                    "action": "close",
+                    "application": app_name,
+                    "status": verify_res["status"],
+                    "success": verify_res["success"],
+                    "message": verify_res["message"],
+                    "verification": verify_res.get("verification", {})
+                }
             else:
-                return {"action": "close", "status": "error", "message": "Close action is only supported on Windows."}
+                return {"action": "close", "status": "failed", "success": False, "message": "Close action is only supported on Windows."}
 
         elif action == "open":
             target = app_name.strip().lower()
             if not target:
                 raise ValueError("Application name is required for 'open' action.")
+
+            from dexter.tools.verifier import ActionVerifier, ActionResultStatus
+
+            canonical = self.CANONICAL_ALIASES.get(target, target)
 
             # Check special alias (URL, special folder, or settings URI)
             if target in self.APP_ALIASES:
@@ -314,33 +332,92 @@ class ApplicationTool(BaseTool):
                     target_url = alias["url"]
                     if sys.platform == "win32":
                         os.startfile(target_url)
+                        verify_res = await ActionVerifier.verify_app_launch(
+                            app_name=app_name,
+                            canonical="chrome",
+                            process_hints=["chrome", "msedge", "firefox", "brave"],
+                            timeout=5.0
+                        )
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "url": target_url,
+                            "status": verify_res["status"],
+                            "success": verify_res["success"],
+                            "message": f"{app_name.capitalize()} is open in your browser." if verify_res["success"] else verify_res["message"],
+                            "verification": verify_res.get("verification", {})
+                        }
                     else:
                         subprocess.Popen(["xdg-open", target_url])
-                    return {"action": "open", "application": app_name, "status": "launched", "message": f"Opened {app_name} ({target_url})."}
+                        return {"action": "open", "application": app_name, "status": "executed_unverified", "message": f"Opened {app_name}."}
+
                 elif "path" in alias:
                     target_path = alias["path"]
                     if sys.platform == "win32":
                         os.startfile(target_path)
+                        verify_res = await ActionVerifier.verify_app_launch(
+                            app_name=app_name,
+                            canonical="explorer",
+                            process_hints=["explorer"],
+                            timeout=5.0
+                        )
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "path": target_path,
+                            "status": verify_res["status"],
+                            "success": verify_res["success"],
+                            "message": f"Opened {app_name} folder." if verify_res["success"] else verify_res["message"],
+                            "verification": verify_res.get("verification", {})
+                        }
                     else:
                         subprocess.Popen(["xdg-open", target_path])
-                    return {"action": "open", "application": app_name, "status": "launched", "message": f"Opened {app_name} folder ({target_path})."}
+                        return {"action": "open", "application": app_name, "status": "executed_unverified", "message": f"Opened {app_name} folder."}
+
                 elif "uri" in alias:
                     if sys.platform == "win32":
                         os.startfile(alias["uri"])
-                    return {"action": "open", "application": app_name, "status": "launched", "message": f"Opened Windows {app_name}."}
+                        verify_res = await ActionVerifier.verify_app_launch(
+                            app_name=app_name,
+                            canonical="systemsettings",
+                            process_hints=["systemsettings", "control"],
+                            timeout=5.0
+                        )
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "status": verify_res["status"],
+                            "success": verify_res["success"],
+                            "message": f"Opened Windows {app_name}." if verify_res["success"] else verify_res["message"],
+                            "verification": verify_res.get("verification", {})
+                        }
 
-            # If user provided a direct URL as app_name or args
+            # If user provided a direct URL
             if target.startswith("http://") or target.startswith("https://"):
                 if sys.platform == "win32":
                     os.startfile(target)
-                return {"action": "open", "application": target, "status": "launched", "message": f"Opened URL {target} in default browser."}
+                    verify_res = await ActionVerifier.verify_app_launch(
+                        app_name="Browser",
+                        canonical="chrome",
+                        process_hints=["chrome", "msedge", "firefox", "brave"],
+                        timeout=5.0
+                    )
+                    return {
+                        "action": "open",
+                        "application": target,
+                        "status": verify_res["status"],
+                        "success": verify_res["success"],
+                        "message": f"Opened {target} in browser." if verify_res["success"] else verify_res["message"],
+                        "verification": verify_res.get("verification", {})
+                    }
+                return {"action": "open", "application": target, "status": "executed_unverified", "message": f"Opened {target}."}
 
             bin_path = self._resolve_binary(target)
-            
+
             if bin_path:
                 try:
+                    proc_hint = os.path.splitext(os.path.basename(bin_path))[0].lower()
                     if sys.platform == "win32":
-                        # Launch in foreground cleanly without attached terminal window
                         if args:
                             try:
                                 os.startfile(bin_path, arguments=args.strip())
@@ -351,35 +428,133 @@ class ApplicationTool(BaseTool):
                                 os.startfile(bin_path)
                             except Exception:
                                 subprocess.Popen([bin_path], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+
+                        # VERIFY that the application actually produced a visible window on the desktop
+                        verify_res = await ActionVerifier.verify_app_launch(
+                            app_name=app_name,
+                            canonical=canonical,
+                            process_hints=[proc_hint],
+                            timeout=5.0
+                        )
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "command": bin_path,
+                            "status": verify_res["status"],
+                            "success": verify_res["success"],
+                            "message": verify_res["message"],
+                            "verification": verify_res.get("verification", {})
+                        }
                     else:
                         launch_args = [bin_path]
                         if args:
                             launch_args.append(args.strip())
                         subprocess.Popen(launch_args, start_new_session=True)
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "status": "executed_unverified",
+                            "message": f"Launched {app_name} on Unix host."
+                        }
+                except Exception as e:
                     return {
                         "action": "open",
                         "application": app_name,
-                        "command": bin_path,
-                        "args": args,
-                        "status": "launched",
-                        "message": f"Successfully launched {app_name}.",
+                        "status": "failed",
+                        "success": False,
+                        "error": str(e),
+                        "message": f"Failed to launch {app_name}: {e}"
                     }
-                except Exception as e:
-                    return {"action": "open", "application": app_name, "status": "error", "error": str(e)}
 
             # Fallback for Windows protocol / app name (e.g. calc:, ms-settings:, or direct shell start)
             if sys.platform == "win32":
                 try:
                     os.startfile(target)
-                    return {"action": "open", "application": app_name, "status": "launched", "message": f"Opened {app_name} via Windows shell."}
+                    verify_res = await ActionVerifier.verify_app_launch(
+                        app_name=app_name,
+                        canonical=canonical,
+                        process_hints=[canonical, target],
+                        timeout=5.0
+                    )
+                    return {
+                        "action": "open",
+                        "application": app_name,
+                        "status": verify_res["status"],
+                        "success": verify_res["success"],
+                        "message": verify_res["message"],
+                        "verification": verify_res.get("verification", {})
+                    }
                 except Exception:
                     try:
                         subprocess.Popen(f'start "" "{target}"', shell=True)
-                        return {"action": "open", "application": app_name, "status": "launched", "message": f"Started {app_name}."}
+                        verify_res = await ActionVerifier.verify_app_launch(
+                            app_name=app_name,
+                            canonical=canonical,
+                            process_hints=[canonical, target],
+                            timeout=5.0
+                        )
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "status": verify_res["status"],
+                            "success": verify_res["success"],
+                            "message": verify_res["message"],
+                            "verification": verify_res.get("verification", {})
+                        }
                     except Exception as e:
-                        raise FileNotFoundError(f"Could not locate or launch application '{app_name}' on your computer. Error: {e}")
+                        return {
+                            "action": "open",
+                            "application": app_name,
+                            "status": "failed",
+                            "success": False,
+                            "error": str(e),
+                            "message": f"Could not locate or launch application '{app_name}' on your computer. Error: {e}"
+                        }
 
-            raise FileNotFoundError(f"Application '{app_name}' could not be located on the system.")
+            return {
+                "action": "open",
+                "application": app_name,
+                "status": "failed",
+                "success": False,
+                "message": f"Application '{app_name}' could not be located on the system."
+            }
+
+    def format_display(self, result: Any) -> str:
+        out = result.output if hasattr(result, "output") else result
+        if isinstance(out, dict):
+            status = out.get("status", "")
+            action = out.get("action", "")
+            msg = out.get("message")
+
+            if msg:
+                return msg
+
+            if action == "open":
+                app = out.get("application", "Application")
+                if status == "verified":
+                    return f"{app.capitalize()} is open and visible."
+                elif status == "timeout":
+                    return f"I couldn't open {app}. Windows did not produce a visible window within 5 seconds."
+                elif status == "failed":
+                    return f"Failed to open {app}."
+                return f"Application status: {status}"
+
+            elif action == "close":
+                app = out.get("application", "Application")
+                if status == "verified":
+                    return f"{app.capitalize()} closed."
+                elif status == "failed":
+                    return f"{app.capitalize()} is still open."
+                return f"Close action status: {status}"
+
+            elif action == "list":
+                apps = out.get("applications", [])
+                lines = ["Applications:"]
+                for app in apps:
+                    lines.append(f"- {app['name']}: {'Installed' if app['installed'] else 'Not Installed'}")
+                return "\n".join(lines)
+
+        return str(out)
 
     def intent_patterns(self) -> list[dict]:
         def extract_open(m) -> dict:

@@ -126,7 +126,12 @@ class WindowManagerTool(BaseTool):
 
         if action in ["list", "list_windows"]:
             windows = _list_windows()
-            return {"status": "success", "action": "list_windows", "windows": windows}
+            return {
+                "status": "success",
+                "action": "list_windows",
+                "windows": windows,
+                "verification": {"status": "verified", "verified": True, "count": len(windows)},
+            }
             
         if not title:
             return {"status": "error", "message": "Window title required"}
@@ -138,43 +143,81 @@ class WindowManagerTool(BaseTool):
         hwnd = target['hwnd']
         matched_title = target['title']
         
+        from dexter.tools.verifier import ActionVerifier, ActionResultStatus, wait_for_condition
+
         if action == "focus_window":
-            user32.AllowSetForegroundWindow(-1)
-            if user32.IsIconic(hwnd):
-                user32.ShowWindow(hwnd, SW_RESTORE)
-            user32.SetForegroundWindow(hwnd)
-            return {"status": "success", "action": action, "window": matched_title}
-            
+            verify_res = await ActionVerifier.verify_window_focus(hwnd, matched_title)
+            return {
+                "action": action,
+                "window": matched_title,
+                "status": verify_res["status"],
+                "success": verify_res["success"],
+                "message": verify_res["message"],
+                "verification": verify_res.get("verification", {})
+            }
+
         elif action == "minimize":
-            user32.ShowWindow(hwnd, SW_MINIMIZE)
-            return {"status": "success", "action": action, "window": matched_title}
-            
+            verify_res = await ActionVerifier.verify_window_minimize(hwnd, matched_title)
+            return {
+                "action": action,
+                "window": matched_title,
+                "status": verify_res["status"],
+                "success": verify_res["success"],
+                "message": verify_res["message"],
+                "verification": verify_res.get("verification", {})
+            }
+
         elif action == "maximize":
-            user32.ShowWindow(hwnd, SW_MAXIMIZE)
-            return {"status": "success", "action": action, "window": matched_title}
-            
+            verify_res = await ActionVerifier.verify_window_maximize(hwnd, matched_title)
+            return {
+                "action": action,
+                "window": matched_title,
+                "status": verify_res["status"],
+                "success": verify_res["success"],
+                "message": verify_res["message"],
+                "verification": verify_res.get("verification", {})
+            }
+
         elif action == "restore":
             user32.ShowWindow(hwnd, SW_RESTORE)
-            return {"status": "success", "action": action, "window": matched_title}
-            
+            time.sleep(0.1)
+            is_iconic = bool(user32.IsIconic(hwnd))
+            return {
+                "action": action,
+                "window": matched_title,
+                "status": "verified" if not is_iconic else "failed",
+                "success": not is_iconic,
+                "message": f"Restored {matched_title}." if not is_iconic else f"Failed to restore {matched_title}.",
+                "verification": {"hwnd": hwnd, "minimized": is_iconic}
+            }
+
         elif action == "close_window":
             user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-            return {"status": "success", "action": action, "window": matched_title}
-            
-        return {"status": "error", "message": "Invalid action"}
+            verify_res = await ActionVerifier.verify_app_close(matched_title, [hwnd], timeout=3.0)
+            return {
+                "action": action,
+                "window": matched_title,
+                "status": verify_res["status"],
+                "success": verify_res["success"],
+                "message": verify_res["message"],
+                "verification": verify_res.get("verification", {})
+            }
+
+        return {"status": "error", "success": False, "message": "Invalid action"}
 
     def format_display(self, result: Any) -> str:
         out = result.output if hasattr(result, "output") else result
         if isinstance(out, dict):
             status = out.get('status')
-            if status == 'error':
-                return f"Window Error: {out.get('message')}"
-                
+            msg = out.get('message')
+            if msg:
+                return msg
+
             action = out.get('action')
             if action == 'list_windows':
                 wins = out.get('windows', [])
                 lines = [f"{'[Active] ' if w['is_foreground'] else '• '}{w['title']}" for w in wins[:15]]
                 return f"Open Windows ({len(wins)}):\n" + "\n".join(lines)
             else:
-                return f"Window action '{action}' completed on \"{out.get('window')}\"."
+                return f"Window action '{action}' on \"{out.get('window')}\": {status}."
         return str(out)
