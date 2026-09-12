@@ -1,7 +1,7 @@
 """Unit tests for Victor SQLite Memory Store."""
 
 import pytest
-from victor.memory.store import MemoryStore
+from dexter.memory.store import MemoryStore
 
 
 def test_memory_preferences(tmp_path):

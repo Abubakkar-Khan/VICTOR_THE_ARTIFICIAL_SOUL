@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from victor.api.server import app
+from dexter.api.server import app
 
 client = TestClient(app)
 
@@ -17,7 +17,7 @@ def test_api_status():
     res = client.get("/api/status")
     assert res.status_code == 200
     data = res.json()
-    assert data["name"] == "Victor"
+    assert data["name"] == "Dexter"
     assert data["tools_count"] >= 5
     assert "personality" in data
 

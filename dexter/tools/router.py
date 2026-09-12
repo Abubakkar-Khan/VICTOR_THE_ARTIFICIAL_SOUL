@@ -1,0 +1,47 @@
+import re
+from typing import Any, Dict, Optional, Tuple
+
+from dexter.tools.registry import ToolRegistry
+
+
+class ToolRouter:
+    """Routes user input to the correct tool based on intent patterns."""
+    def __init__(self, registry: ToolRegistry):
+        self.registry = registry
+
+    def route(self, user_input: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+        """Iterates all registered tools, checks their intent_patterns, and returns (tool_name, extracted_params)."""
+        cleaned = user_input.strip()
+        lower = cleaned.lower()
+        # Normalize polite phrasing: "can you please open chrome" -> "open chrome"
+        normalized = re.sub(r'^(?:can\s+you\s+(?:please\s+)?|could\s+you\s+(?:please\s+)?|would\s+you\s+(?:please\s+)?|please\s+|kindly\s+)', '', lower).strip()
+
+        for tool in self.registry.list_tools():
+            patterns = tool.intent_patterns()
+            for pattern_dict in patterns:
+                pattern = pattern_dict.get("pattern", "")
+                m = re.match(pattern, normalized) or re.match(pattern, lower) or re.search(pattern, cleaned)
+                if m:
+                    extract = pattern_dict.get("extract")
+                    params = {}
+                    
+                    if callable(extract):
+                        # Allow custom extraction logic
+                        params = extract(m)
+                    elif isinstance(extract, str):
+                        # Single parameter extracted from group 1 or group 0
+                        val = m.group(1).strip() if m.lastindex else m.group(0).strip()
+                        params[extract] = val
+                    elif isinstance(extract, dict):
+                        # Dictionary for static params or mapping
+                        for k, v in extract.items():
+                            if isinstance(v, int):
+                                params[k] = m.group(v)
+                            else:
+                                params[k] = v
+
+                    if params is not None and (params or isinstance(extract, dict)):
+                        return (tool.name, params)
+
+        return None
+

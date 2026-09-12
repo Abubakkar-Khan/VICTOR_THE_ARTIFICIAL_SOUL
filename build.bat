@@ -1,5 +1,5 @@
 @echo off
-title Victor — The Artificial Soul Builder
+title Dexter — The Artificial Soul Builder
 python builder.py %*
 if %errorlevel% neq 0 (
     echo.

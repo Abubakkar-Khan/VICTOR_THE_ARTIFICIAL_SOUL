@@ -1,30 +1,30 @@
 # Product Requirements Document (PRD)
-## Victor — The Artificial Soul: Hybrid Simulated-Intelligence Desktop Companion
+## Dexter — The Artificial Soul: Hybrid Simulated-Intelligence Desktop Companion
 
 ---
 
 ### Executive Summary & Central Hypothesis
 
-**Victor** is not a simple LLM wrapper, generic chatbot, or corporate automation dashboard. 
+**Dexter** is not a simple LLM wrapper, generic chatbot, or corporate automation dashboard. 
 
-The central innovation of Victor is a **Hybrid Simulated-Intelligence Architecture**: combining a compact, interchangeable neural model (ranging from **100M to 1.5B parameters**) with deterministic and probabilistic cognitive scaffolding to produce the tangible experience and functional competence of a living mind on a computer.
+The central innovation of Dexter is a **Hybrid Simulated-Intelligence Architecture**: combining a compact, interchangeable neural model (ranging from **100M to 1.5B parameters**) with deterministic and probabilistic cognitive scaffolding to produce the tangible experience and functional competence of a living mind on a computer.
 
 #### The Core Research Question
 > *"How capable, reliable, and expressive can a small neural model become when surrounded by deterministic reasoning, structured retrieval, episodic memory, closed-loop tools, recursive self-verification, and an embodied persistent persona?"*
 
-Rather than relying on massive 70B+ parameter clouds or opaque API endpoints, Victor treats the small local language model as a sensory-linguistic transducer within an engineered cognitive operating system. Victor is local-first, privacy-preserving, runs on consumer laptop hardware, and manifests physically through a charming, responsive pixel-art companion on the user's desktop paired with a quiet, distraction-free Workshop.
+Rather than relying on massive 70B+ parameter clouds or opaque API endpoints, Dexter treats the small local language model as a sensory-linguistic transducer within an engineered cognitive operating system. Dexter is local-first, privacy-preserving, runs on consumer laptop hardware, and manifests physically through a charming, responsive pixel-art companion on the user's desktop paired with a quiet, distraction-free Workshop.
 
 ---
 
 ## 1. Product Vision & Philosophy
 
 ### 1.1 Dual Embodiment
-1. **The Desktop Companion**: A lightweight, borderless, transparent desktop mascot rendered with an expressive 8-emotion pixel sprite sheet. Victor sits unobtrusively on the screen, breathing, sleeping, observing mouse motion, and reacting to computer events with procedural electronic chimes and micro-expressions.
+1. **The Desktop Companion**: A lightweight, borderless, transparent desktop mascot rendered with an expressive 8-emotion pixel sprite sheet. Dexter sits unobtrusively on the screen, breathing, sleeping, observing mouse motion, and reacting to computer events with procedural electronic chimes and micro-expressions.
 2. **The Workshop**: A typography-first environment where the user can engage in long-form dialogue, inspect autonomous multi-step cognitive plans, browse the notebook-style memory store, inspect tools, and configure neural weights.
 
 ### 1.2 Anti-Patterns Excluded by Design
 - **No Chatbot Clichés**: No generic blue-gradient AI dashboards, no animated glowing neon spheres, no corporate marketing jargon.
-- **No Robotic Text-to-Speech (TTS)**: Victor speaks via **Celeste-inspired procedural audio synthesis** (warm, pentatonic square/triangle wave chimes synchronized to expression and text length) reminiscent of classic indie games (*Celeste*, *Animal Crossing*, *Undertale*).
+- **No Robotic Text-to-Speech (TTS)**: Dexter speaks via **Celeste-inspired procedural audio synthesis** (warm, pentatonic square/triangle wave chimes synchronized to expression and text length) reminiscent of classic indie games (*Celeste*, *Animal Crossing*, *Undertale*).
 - **No Unrestricted Model Tooling**: Models never run raw, unparsed strings directly on the OS. All computer interactions pass through deterministic, typed, schema-validated tool contracts with strict human-in-the-loop permission tiers.
 
 ---
@@ -64,7 +64,7 @@ Rather than relying on massive 70B+ parameter clouds or opaque API endpoints, Vi
 
 ## 3. Cognitive Engine Architecture
 
-Victor compensates for smaller neural model capacities (100M–1.5B) by surrounding the neural layer with robust deterministic structures:
+Dexter compensates for smaller neural model capacities (100M–1.5B) by surrounding the neural layer with robust deterministic structures:
 
 ### 3.1 Intent & Perception System
 - **Deterministic Matchers**: Zero-latency regex and keyword intent routing for unambiguous directives (e.g., calculations, application launching, screen coordinate inspection, URL scraping).
@@ -99,7 +99,7 @@ Victor compensates for smaller neural model capacities (100M–1.5B) by surround
 
 ## 4. The Hybrid Intelligence Loop
 
-Every task in Victor executes within a formal closed-loop cognitive cycle:
+Every task in Dexter executes within a formal closed-loop cognitive cycle:
 
 $$\text{Perceive} \longrightarrow \text{Understand} \longrightarrow \text{Retrieve} \longrightarrow \text{Plan} \longrightarrow \text{Act} \longrightarrow \text{Observe} \longrightarrow \text{Verify} \longrightarrow \text{Reflect} \longrightarrow \text{Commit} \longrightarrow \text{Synthesize}$$
 
@@ -118,7 +118,7 @@ $$\text{Perceive} \longrightarrow \text{Understand} \longrightarrow \text{Retrie
 
 ## 5. The Artificial Soul Layer
 
-Victor possesses an internal state vector that modulates its behavior, dialogue, sound, and visual appearance:
+Dexter possesses an internal state vector that modulates its behavior, dialogue, sound, and visual appearance:
 
 ### 5.1 The 8 Core Emotional States
 
@@ -188,12 +188,12 @@ Emotion is never cosmetic:
 
 ## 8. Experimental & Research Framework
 
-Victor is structured as an experimental testbed to benchmark small neural models:
+Dexter is structured as an experimental testbed to benchmark small neural models:
 
 ### 8.1 Evaluated Model Spectrum
 - **100M–200M**: Ultra-compact models (e.g., SmolLM-135M). Evaluates basic pattern recognition and classification under deterministic guidance.
 - **500M**: Compact models (e.g., Qwen2.5-0.5B). Evaluates multi-step sub-goal decomposition.
-- **1B–1.5B**: Standard Victor tier (e.g., Qwen2-1.5B, Qwen2.5-1.5B). Evaluates full conversational synthesis, nuanced personality expression, and robust error recovery.
+- **1B–1.5B**: Standard Dexter tier (e.g., Qwen2-1.5B, Qwen2.5-1.5B). Evaluates full conversational synthesis, nuanced personality expression, and robust error recovery.
 
 ### 8.2 Standardized Evaluation Metrics
 - **Cognitive Success Rate**: Percentage of complex user goals achieved without human intervention.

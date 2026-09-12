@@ -26,12 +26,12 @@ BANNER = r"""
 """
 
 
-class VictorBuilder:
+class DexterBuilder:
     def __init__(self, skip_tests: bool = False, make_zip: bool = False, clean: bool = True, run_after: bool = False):
         self.root_dir = Path(__file__).resolve().parent
         self.dist_dir = self.root_dir / "dist"
         self.build_dir = self.root_dir / "build"
-        self.spec_file = self.root_dir / "victor.spec"
+        self.spec_file = self.root_dir / "dexter.spec"
         self.skip_tests = skip_tests
         self.make_zip = make_zip
         self.clean = clean
@@ -79,26 +79,26 @@ class VictorBuilder:
     def verify_assets(self):
         self.log("2/5", "Verifying application source assets...")
         required_paths = [
-            self.root_dir / "victor" / "web" / "index.html",
-            self.root_dir / "victor" / "web" / "style.css",
-            self.root_dir / "victor" / "web" / "app.js",
-            self.root_dir / "victor" / "sprite" / "neutral.png",
-            self.root_dir / "victor" / "sprite" / "happy.png",
-            self.root_dir / "victor" / "sprite" / "curious.png",
-            self.root_dir / "victor" / "sprite" / "idle.png",
-            self.root_dir / "victor" / "sprite" / "bored.png",
-            self.root_dir / "victor" / "sprite" / "thinking.png",
-            self.root_dir / "victor" / "sprite" / "searching.png",
-            self.root_dir / "victor" / "sprite" / "excited.png",
-            self.root_dir / "victor" / "sprite" / "eureka.png",
-            self.root_dir / "victor" / "sprite" / "confused.png",
-            self.root_dir / "victor" / "sprite" / "concerned.png",
-            self.root_dir / "victor" / "sprite" / "listening.png",
-            self.root_dir / "victor" / "sprite" / "skeptical.png",
-            self.root_dir / "victor" / "sprite" / "icon.ico",
-            self.root_dir / "victor" / "web" / "favicon.ico",
-            self.root_dir / "victor" / "web" / "favicon.png",
-            self.root_dir / "config" / "victor.yaml",
+            self.root_dir / "dexter" / "web" / "index.html",
+            self.root_dir / "dexter" / "web" / "style.css",
+            self.root_dir / "dexter" / "web" / "app.js",
+            self.root_dir / "dexter" / "sprite" / "neutral.png",
+            self.root_dir / "dexter" / "sprite" / "happy.png",
+            self.root_dir / "dexter" / "sprite" / "curious.png",
+            self.root_dir / "dexter" / "sprite" / "idle.png",
+            self.root_dir / "dexter" / "sprite" / "bored.png",
+            self.root_dir / "dexter" / "sprite" / "thinking.png",
+            self.root_dir / "dexter" / "sprite" / "searching.png",
+            self.root_dir / "dexter" / "sprite" / "excited.png",
+            self.root_dir / "dexter" / "sprite" / "eureka.png",
+            self.root_dir / "dexter" / "sprite" / "confused.png",
+            self.root_dir / "dexter" / "sprite" / "concerned.png",
+            self.root_dir / "dexter" / "sprite" / "listening.png",
+            self.root_dir / "dexter" / "sprite" / "skeptical.png",
+            self.root_dir / "dexter" / "sprite" / "icon.ico",
+            self.root_dir / "dexter" / "web" / "favicon.ico",
+            self.root_dir / "dexter" / "web" / "favicon.png",
+            self.root_dir / "config" / "dexter.yaml",
             self.spec_file,
         ]
 
@@ -139,7 +139,7 @@ class VictorBuilder:
         if res.returncode != 0:
             self.error("PyInstaller compilation failed.")
 
-        exe_path = self.dist_dir / "Victor" / "Victor.exe"
+        exe_path = self.dist_dir / "Dexter" / "Dexter.exe"
         if not exe_path.exists():
             self.error(f"Expected compiled binary not found at: {exe_path}")
 
@@ -148,28 +148,27 @@ class VictorBuilder:
 
     def package_distribution(self):
         self.log("5/5", "Finalizing distribution artifacts...")
-        victor_dist = self.dist_dir / "Victor"
-
-        # Provide Dextex.exe alias executable
-        victor_exe = victor_dist / "Victor.exe"
-        dextex_exe = victor_dist / "Dextex.exe"
-        if victor_exe.exists():
-            shutil.copy2(victor_exe, dextex_exe)
-            print("      [OK] Provided Dextex.exe alias executable in dist/Victor/")
+        dexter_dist = self.dist_dir / "Dexter"
 
         # Ensure config directory is accessible in root dist folder for user customization
-        user_config_dir = victor_dist / "config"
+        user_config_dir = dexter_dist / "config"
         user_config_dir.mkdir(exist_ok=True)
-        src_config = self.root_dir / "config" / "victor.yaml"
-        if src_config.exists() and not (user_config_dir / "victor.yaml").exists():
-            shutil.copy2(src_config, user_config_dir / "victor.yaml")
-            print("      [OK] Seeded user config at dist/Victor/config/victor.yaml")
+        src_config = self.root_dir / "config" / "dexter.yaml"
+        if src_config.exists() and not (user_config_dir / "dexter.yaml").exists():
+            shutil.copy2(src_config, user_config_dir / "dexter.yaml")
+            print("      [OK] Seeded user config at dist/Dexter/config/dexter.yaml")
+
+        # Copy skills directory into dist
+        src_skills = self.root_dir / "skills"
+        if src_skills.exists():
+            shutil.copytree(src_skills, dexter_dist / "skills", dirs_exist_ok=True)
+            print("      [OK] Seeded skills at dist/Dexter/skills/")
 
         if self.make_zip:
-            zip_path = self.dist_dir / "Dextex-Standalone-v2.7.zip"
+            zip_path = self.dist_dir / "Dexter-Standalone-v3.0.zip"
             print(f"      Packaging zip archive: {zip_path.name}...")
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                for root, _, files in os.walk(victor_dist):
+                for root, _, files in os.walk(dexter_dist):
                     for file in files:
                         full_path = Path(root) / file
                         rel_path = full_path.relative_to(self.dist_dir)
@@ -178,7 +177,7 @@ class VictorBuilder:
             print(f"      [OK] Created portable distribution archive ({zip_size_mb:.1f} MB)")
 
     def launch(self):
-        exe_path = self.dist_dir / "Victor" / "Victor.exe"
+        exe_path = self.dist_dir / "Dexter" / "Dexter.exe"
         if self.run_after and exe_path.exists():
             print(f"\n[LAUNCH] Launching {exe_path}...")
             subprocess.Popen([str(exe_path)], cwd=str(exe_path.parent))
@@ -195,24 +194,28 @@ class VictorBuilder:
 
         self.success(f"BUILD COMPLETE in {total_time:.1f} seconds!")
         print("=============================================================")
-        print(f"  Executable:  dist\\Victor\\Victor.exe")
-        print(f"  Directory:   {self.dist_dir / 'Victor'}")
+        print(f"  Executable:  dist\\Dexter\\Dexter.exe")
+        print(f"  Directory:   {self.dist_dir / 'Dexter'}")
         if self.make_zip:
-            print(f"  Zip Archive: dist\\Victor-Standalone-v2.5.zip")
+            print(f"  Zip Archive: dist\\Dexter-Standalone-v3.0.zip")
         print("=============================================================\n")
 
         self.launch()
 
 
+# Backward compatibility alias
+VictorBuilder = DexterBuilder
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Victor Desktop Application Builder")
+    parser = argparse.ArgumentParser(description="Dexter Desktop Application Builder")
     parser.add_argument("--skip-tests", action="store_true", help="Skip running the pytest suite")
     parser.add_argument("--zip", action="store_true", help="Generate a portable distribution .zip archive")
     parser.add_argument("--no-clean", action="store_true", help="Do not pass --clean to PyInstaller")
     parser.add_argument("--run", action="store_true", help="Launch the compiled application after building")
 
     args = parser.parse_args()
-    builder = VictorBuilder(
+    builder = DexterBuilder(
         skip_tests=args.skip_tests,
         make_zip=args.zip,
         clean=not args.no_clean,

@@ -1,13 +1,13 @@
 {
-  "name": "victor-artificial-soul",
+  "name": "dexter-artificial-soul",
   "version": "1.0.0",
-  "description": "Victor — The Artificial Soul Desktop Companion",
+  "description": "Dexter — The Artificial Soul Desktop Companion",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder"
   },
   "keywords": ["ai", "companion", "desktop", "pixel-art"],
-  "author": "Victor Team",
+  "author": "Dexter Team",
   "license": "MIT"
 }

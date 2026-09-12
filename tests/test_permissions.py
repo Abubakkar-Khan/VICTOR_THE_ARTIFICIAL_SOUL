@@ -1,7 +1,7 @@
 """Unit tests for Victor Permission Manager."""
 
 import pytest
-from victor.permissions.manager import (
+from dexter.permissions.manager import (
     PermissionDecision,
     PermissionLevel,
     PermissionManager,

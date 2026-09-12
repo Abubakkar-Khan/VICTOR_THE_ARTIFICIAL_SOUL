@@ -1,8 +1,8 @@
 """Unit tests for Victor Task Manager."""
 
 import pytest
-from victor.memory.store import MemoryStore
-from victor.tasks.manager import TaskManager
+from dexter.memory.store import MemoryStore
+from dexter.tasks.manager import TaskManager
 
 
 def test_task_lifecycle(tmp_path):

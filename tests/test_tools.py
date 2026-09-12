@@ -1,12 +1,12 @@
 """Unit tests for Victor tools and tool registry."""
 
 import pytest
-from victor.core.config import SecurityConfig
-from victor.tools.base import PermissionLevel
-from victor.tools.calculator import CalculatorTool
-from victor.tools.filesystem import FilesystemTool
-from victor.tools.registry import ToolRegistry
-from victor.tools.shell import ShellTool
+from dexter.core.config import SecurityConfig
+from dexter.tools.base import PermissionLevel
+from dexter.tools.calculator import CalculatorTool
+from dexter.tools.filesystem import FilesystemTool
+from dexter.tools.registry import ToolRegistry
+from dexter.tools.shell import ShellTool
 
 
 @pytest.mark.asyncio
@@ -70,7 +70,7 @@ async def test_filesystem_tool_boundary(tmp_path):
 
 @pytest.mark.asyncio
 async def test_youtube_tool():
-    from victor.tools.youtube import YouTubeTool
+    from dexter.tools.youtube import YouTubeTool
     tool = YouTubeTool()
     res = await tool.execute(query="compiler construction beginner")
     assert res.success is True
@@ -81,7 +81,7 @@ async def test_youtube_tool():
 
 @pytest.mark.asyncio
 async def test_applications_tool_list():
-    from victor.tools.applications import ApplicationTool
+    from dexter.tools.applications import ApplicationTool
     tool = ApplicationTool()
     res = await tool.execute(action="list")
     assert res.success is True
@@ -90,9 +90,32 @@ async def test_applications_tool_list():
     assert "notepad" in names or "terminal" in names or "chrome" in names
 
 
+def test_applications_tool_resolve_binary():
+    import sys
+    from dexter.tools.applications import ApplicationTool
+    tool = ApplicationTool()
+    if sys.platform == "win32":
+        # VS Code, Notepad, Explorer, Calculator should resolve on Windows
+        assert tool._resolve_binary("notepad") is not None
+        assert tool._resolve_binary("explorer") is not None
+        assert tool._resolve_binary("vs code") is not None
+        assert tool._resolve_binary("visual studio code") is not None
+        assert tool._resolve_binary("code") is not None
+        # Format display check
+        from dexter.tools.base import ToolResult
+        dummy_res = ToolResult(
+            tool_name="applications",
+            success=True,
+            output={"action": "open", "application": "vs code", "status": "launched"}
+        )
+        msg = tool.format_display(dummy_res)
+        assert "VS Code is now open" in msg
+
+
+
 @pytest.mark.asyncio
 async def test_computer_tool_info():
-    from victor.tools.computer import ComputerTool
+    from dexter.tools.computer import ComputerTool
     tool = ComputerTool()
     res = await tool.execute(action="screen_info")
     assert res.success is True
@@ -102,7 +125,7 @@ async def test_computer_tool_info():
 
 @pytest.mark.asyncio
 async def test_notification_tool():
-    from victor.tools.notifications import NotificationTool
+    from dexter.tools.notifications import NotificationTool
     tool = NotificationTool()
     res = await tool.execute(message="Unit test notification", title="Victor")
     assert res.success is True
@@ -111,7 +134,7 @@ async def test_notification_tool():
 
 @pytest.mark.asyncio
 async def test_keyboard_tool():
-    from victor.tools.keyboard import KeyboardTool
+    from dexter.tools.keyboard import KeyboardTool
     tool = KeyboardTool()
     # Test unknown key
     err_res = await tool.execute(action="press_key", key="nonexistent_key_xyz")
@@ -125,7 +148,7 @@ async def test_keyboard_tool():
 
 @pytest.mark.asyncio
 async def test_window_manager_tool():
-    from victor.tools.window_manager import WindowManagerTool
+    from dexter.tools.window_manager import WindowManagerTool
     tool = WindowManagerTool()
     res = await tool.execute(action="list_windows")
     assert res.success is True
@@ -139,7 +162,7 @@ async def test_window_manager_tool():
 
 @pytest.mark.asyncio
 async def test_screen_observer_tool():
-    from victor.tools.screen_observer import ScreenObserverTool
+    from dexter.tools.screen_observer import ScreenObserverTool
     tool = ScreenObserverTool()
     res = await tool.execute(action="observe_screen")
     assert res.success is True
@@ -148,7 +171,7 @@ async def test_screen_observer_tool():
 
 @pytest.mark.asyncio
 async def test_filesystem_search_and_list(tmp_path):
-    from victor.tools.filesystem import FilesystemTool
+    from dexter.tools.filesystem import FilesystemTool
     (tmp_path / "test_doc1.txt").write_text("hello", encoding="utf-8")
     (tmp_path / "test_doc2.log").write_text("world", encoding="utf-8")
     sub = tmp_path / "subdir"
@@ -172,8 +195,8 @@ async def test_filesystem_search_and_list(tmp_path):
 
 @pytest.mark.asyncio
 async def test_tool_router_pc_intents():
-    from victor.tools.factory import create_tool_registry
-    from victor.tools.router import ToolRouter
+    from dexter.tools.factory import create_tool_registry
+    from dexter.tools.router import ToolRouter
     
     registry = create_tool_registry()
     router = ToolRouter(registry)
@@ -197,6 +220,19 @@ async def test_tool_router_pc_intents():
     assert s_match[0] == "screen_observer"
     assert s_match[1]["action"] == "observe_screen"
 
+    # Test application routing
+    app_match = router.route("open vs code")
+    assert app_match is not None
+    assert app_match[0] == "applications"
+    assert app_match[1]["action"] == "open"
+    assert app_match[1]["app_name"] == "vs code"
+
+    exp_match = router.route("open file explorer")
+    assert exp_match is not None
+    assert exp_match[0] == "applications"
+    assert exp_match[1]["action"] == "open"
+    assert exp_match[1]["app_name"] == "file explorer"
+
     # Test search file routing
     f_match = router.route("search for files named report.pdf")
     assert f_match is not None
@@ -207,7 +243,7 @@ async def test_tool_router_pc_intents():
 
 @pytest.mark.asyncio
 async def test_exec_tool_echo():
-    from victor.tools.shell import ExecTool
+    from dexter.tools.shell import ExecTool
     tool = ExecTool()
     res = await tool.execute(command="echo OpenClaw-Test")
     assert res.success is True
@@ -219,7 +255,7 @@ async def test_exec_tool_echo():
 
 @pytest.mark.asyncio
 async def test_process_tool_list():
-    from victor.tools.process import ProcessTool
+    from dexter.tools.process import ProcessTool
     tool = ProcessTool()
     res = await tool.execute(action="list")
     assert res.success is True
@@ -230,7 +266,7 @@ async def test_process_tool_list():
 
 @pytest.mark.asyncio
 async def test_process_tool_status():
-    from victor.tools.process import ProcessTool
+    from dexter.tools.process import ProcessTool
     tool = ProcessTool()
     res = await tool.execute(action="status", target="nonexistent_process_xyz_12345")
     assert res.success is True
@@ -239,7 +275,7 @@ async def test_process_tool_status():
 
 @pytest.mark.asyncio
 async def test_filesystem_tool_edit_and_append(tmp_path):
-    from victor.tools.filesystem import FilesystemTool
+    from dexter.tools.filesystem import FilesystemTool
     f = tmp_path / "sample.txt"
     f.write_text("line one\nreplace_me_target\nline three\n", encoding="utf-8")
 
@@ -269,7 +305,7 @@ async def test_filesystem_tool_edit_and_append(tmp_path):
 
 
 def test_skill_manager_discovery(tmp_path):
-    from victor.skills.manager import SkillManager
+    from dexter.skills.manager import SkillManager
     # Setup mock workspace skill
     skill_dir = tmp_path / "skills" / "test-skill"
     skill_dir.mkdir(parents=True)

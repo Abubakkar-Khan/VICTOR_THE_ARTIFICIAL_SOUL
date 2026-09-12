@@ -1,12 +1,12 @@
 """Unit tests for Victor agent loop, personality, and tool routing."""
 
 import pytest
-from victor.core.agent import VictorAgent
-from victor.core.config import VictorConfig
-from victor.core.personality import PersonalityEngine
-from victor.models.base import BaseLLM, ChatMessage, LLMResponse
-from victor.tools.router import ToolRouter
-from victor.tools.factory import create_tool_registry
+from dexter.core.agent import DexterAgent
+from dexter.core.config import DexterConfig
+from dexter.core.personality import PersonalityEngine
+from dexter.models.base import BaseLLM, ChatMessage, LLMResponse
+from dexter.tools.router import ToolRouter
+from dexter.tools.factory import create_tool_registry
 
 
 class MockLLM(BaseLLM):
@@ -27,10 +27,10 @@ class MockLLM(BaseLLM):
 
 
 def test_personality_prompt_generation():
-    config = VictorConfig()
+    config = DexterConfig()
     engine = PersonalityEngine(config)
     prompt = engine.build_system_prompt("tool descriptions here")
-    assert "Victor" in prompt
+    assert "Dexter" in prompt
     assert "curiosity" in prompt.lower()
     assert "tool descriptions here" in prompt
 
@@ -67,7 +67,7 @@ def test_tool_router_file_intent():
 
 @pytest.mark.asyncio
 async def test_agent_direct_slash_command():
-    agent = VictorAgent(llm=MockLLM())
+    agent = DexterAgent(llm=MockLLM())
     res = await agent.chat("/calc 25 * 4")
     assert res["type"] == "tool_result"
     assert res["tool_executed"] == "calculator"
@@ -76,7 +76,7 @@ async def test_agent_direct_slash_command():
 
 @pytest.mark.asyncio
 async def test_agent_tools_listing_command():
-    agent = VictorAgent(llm=MockLLM())
+    agent = DexterAgent(llm=MockLLM())
     res = await agent.chat("/tools")
     assert res["type"] == "command_result"
     assert "calculator" in res["content"].lower()
@@ -85,7 +85,7 @@ async def test_agent_tools_listing_command():
 
 @pytest.mark.asyncio
 async def test_agent_extract_tool_call():
-    agent = VictorAgent(llm=MockLLM())
+    agent = DexterAgent(llm=MockLLM())
     sample_text = (
         "I need to calculate this value.\n"
         "```json\n"
@@ -100,7 +100,7 @@ async def test_agent_extract_tool_call():
 
 @pytest.mark.asyncio
 async def test_agent_autonomous_chat_routing():
-    agent = VictorAgent(llm=MockLLM("50 * 20 is 1,000."))
+    agent = DexterAgent(llm=MockLLM("50 * 20 is 1,000."))
     res = await agent.chat("what is 50 * 20?")
     assert res["tool_executed"] is not None
     assert res["tool_executed"]["name"] == "calculator"
@@ -109,7 +109,7 @@ async def test_agent_autonomous_chat_routing():
 
 @pytest.mark.asyncio
 async def test_agent_emotion_and_brevity():
-    agent = VictorAgent(llm=MockLLM("Understood. System is optimal."))
+    agent = DexterAgent(llm=MockLLM("Understood. System is optimal."))
     assert agent.emotion == "idle"
     await agent.set_emotion("happy", reason="Greeting test")
     assert agent.emotion == "happy"
@@ -122,7 +122,7 @@ async def test_agent_emotion_and_brevity():
 @pytest.mark.asyncio
 async def test_anti_lying_interception():
     # If LLM hallucinates an action completion when no tool was executed
-    agent = VictorAgent(llm=MockLLM("I have opened Google Chrome and searched for you."))
+    agent = DexterAgent(llm=MockLLM("I have opened Google Chrome and searched for you."))
     res = await agent.chat("Do something undefined without tool")
     assert "didn't perform that action" in res["content"].lower() or "did not perform that action" in res["content"].lower()
     assert res["emotion"] == "concerned"
@@ -130,7 +130,7 @@ async def test_anti_lying_interception():
 
 @pytest.mark.asyncio
 async def test_honest_failure_reporting():
-    agent = VictorAgent(llm=MockLLM("I successfully read the file!"))
+    agent = DexterAgent(llm=MockLLM("I successfully read the file!"))
     # Request a non-existent file
     res = await agent.chat("read file definitely_non_existent_file_xyz_123.txt")
     assert res["tool_executed"] is not None

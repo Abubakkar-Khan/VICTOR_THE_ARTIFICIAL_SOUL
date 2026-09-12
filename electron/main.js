@@ -8,7 +8,7 @@ let pythonProcess = null;
 
 function startBackend() {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-  pythonProcess = spawn(pythonCmd, ['-m', 'victor.api.server'], {
+  pythonProcess = spawn(pythonCmd, ['-m', 'dexter.api.server'], {
     cwd: path.join(__dirname, '..'),
     shell: true,
     stdio: 'ignore'
@@ -22,8 +22,8 @@ function createWorkshopWindow() {
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#11110F',
-    title: 'Victor — The Artificial Soul',
-    icon: path.join(__dirname, '../victor/sprite/icon.ico'),
+    title: 'Dexter — The Artificial Soul',
+    icon: path.join(__dirname, '../dexter/sprite/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -52,7 +52,7 @@ function createCompanionWindow() {
     resizable: false,
     skipTaskbar: true,
     hasShadow: false,
-    icon: path.join(__dirname, '../victor/sprite/icon.ico'),
+    icon: path.join(__dirname, '../dexter/sprite/icon.ico'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
